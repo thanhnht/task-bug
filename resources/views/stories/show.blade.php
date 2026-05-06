@@ -93,9 +93,6 @@
                 </div>
             @endforeach
         </div>
-@php
-    var_dump($transitions)
-@endphp
         {{-- ── Transition buttons ───────────────────────────────────────────── --}}
         @if (count($transitions) > 0)
             <div class="transition-bar">
