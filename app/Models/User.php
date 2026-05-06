@@ -90,4 +90,20 @@ class User extends Authenticatable
         if (!$this->locked_until) return 0;
         return (int) Carbon::now()->diffInMinutes($this->locked_until, false);
     }
+    public function projects()
+    {
+        return $this->belongsToMany(Project::class, 'project_members')
+            ->withPivot('role', 'joined_at')
+            ->withTimestamps();
+    }
+
+    public function roleInProject(Project $project): ?string
+    {
+        return $project->roleOf($this);
+    }
+
+    public function isPmOf(Project $project): bool
+    {
+        return $project->isPm($this);
+    }
 }

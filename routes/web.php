@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\{ProjectController, StoryController};
 
 // ─── Public routes (chưa đăng nhập) ─────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -38,6 +39,42 @@ Route::middleware(['auth', 'account.active'])->group(function () {
                 Route::post('/{user}/reset-password', [AdminUserController::class, 'resetPassword'])->name('reset-password');
                 Route::post('/{user}/toggle-active',  [AdminUserController::class, 'toggleActive'])->name('toggle-active');
                 Route::post('/{user}/unlock',         [AdminUserController::class, 'unlock'])->name('unlock');
+            });
+        });
+    });
+
+    Route::prefix('projects')->name('projects.')->group(function () {
+
+        Route::get('/',       [ProjectController::class, 'index'])->name('index');
+        Route::get('/create', [ProjectController::class, 'create'])->name('create');
+        Route::post('/',      [ProjectController::class, 'store'])->name('store');
+
+        Route::prefix('{project}')->group(function () {
+            Route::get('/',     [ProjectController::class, 'show'])->name('show');
+            Route::get('/edit', [ProjectController::class, 'edit'])->name('edit');
+            Route::put('/',     [ProjectController::class, 'update'])->name('update');
+
+            // Member management (Admin + PM)
+            Route::post('/members',             [ProjectController::class, 'addMember'])->name('members.add');
+            Route::delete('/members',           [ProjectController::class, 'removeMember'])->name('members.remove');
+            Route::patch('/members/role',       [ProjectController::class, 'updateMemberRole'])->name('members.update-role');
+
+            // ══════════════════════════════════════════════════════════════
+            // STORIES (nested under project)
+            // ══════════════════════════════════════════════════════════════
+            Route::prefix('stories')->name('stories.')->group(function () {
+
+                Route::get('/',           [StoryController::class, 'index'])->name('index');
+                Route::get('/create',     [StoryController::class, 'create'])->name('create'); // PM only
+                Route::post('/',          [StoryController::class, 'store'])->name('store');
+
+                Route::prefix('{story}')->group(function () {
+                    Route::get('/',          [StoryController::class, 'show'])->name('show');
+                    Route::patch('/',        [StoryController::class, 'update'])->name('update');
+                    Route::post('/transition', [StoryController::class, 'transition'])->name('transition');
+
+
+                });
             });
         });
     });
