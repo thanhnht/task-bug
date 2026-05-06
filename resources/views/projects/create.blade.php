@@ -239,6 +239,21 @@
         .create-layout { grid-template-columns: 1fr; }
         .form-row { grid-template-columns: 1fr; }
     }
+    /* chữ bên trong */
+input[type="date"]::-webkit-datetime-edit {
+    color: var(--text-1);
+}
+
+/* icon calendar */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1); /* chuyển icon sang trắng cho hợp dark */
+    opacity: 0.7;
+    cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
 </style>
 @endpush
 
