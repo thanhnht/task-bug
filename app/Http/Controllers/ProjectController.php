@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Project, User, Story};
+use App\Models\{Project, User, Task};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -13,7 +13,7 @@ class ProjectController extends Controller
     public function index()
     {
         $projects = Project::accessibleBy(Auth::user())
-            ->withCount('stories')
+            ->withCount(['tasks as root_tasks_count' => fn($q) => $q->whereNull('parent_id')])
             ->with(['members', 'creator'])
             ->orderByDesc('created_at')
             ->paginate(12);
@@ -74,23 +74,38 @@ class ProjectController extends Controller
     {
         $this->mustBeMember($project);
 
-        $project->load(['creator', 'members', 'stories.developer']);
+        $statusFilter = request('status');
+        $typeFilter   = request('type');
+
+        $project->load(['creator', 'members']);
+
+        $rootTasks = $project->tasks()
+            ->when($statusFilter, fn($q) => $q->where('status', $statusFilter))
+            ->when($typeFilter,   fn($q) => $q->where('type', $typeFilter))
+            ->withCount([
+                'children',
+                'children as pending_children_count' => fn($q) => $q->whereNotIn('status', ['done']),
+            ])
+            ->with('assignee')
+            ->orderByDesc('created_at')
+            ->get();
 
         $user = Auth::user();
         $role = $project->roleOf($user);
 
-        // Stats
+        // Stats luôn tính trên toàn bộ root tasks (không phụ thuộc filter)
+        $allRootStatuses = $project->tasks()->whereNull('parent_id')->selectRaw('status, count(*) as cnt')->groupBy('status')->pluck('cnt', 'status');
         $stats = [
-            'total'    => $project->stories->count(),
-            'todo'     => $project->stories->where('status', 'todo')->count(),
-            'progress' => $project->stories->where('status', 'in_progress')->count(),
-            'review'   => $project->stories->where('status', 'ready_to_review')->count(),
-            'done'     => $project->stories->where('status', 'done')->count(),
+            'total'    => $allRootStatuses->sum(),
+            'todo'     => $allRootStatuses->get('todo', 0),
+            'progress' => $allRootStatuses->get('in_progress', 0),
+            'review'   => $allRootStatuses->get('ready_to_test', 0),
+            'done'     => $allRootStatuses->get('done', 0),
         ];
 
         $employees = User::where('is_active', true)->where('role', 'employee')->orderBy('full_name')->get();
 
-        return view('projects.show', compact('project', 'role', 'stats', 'employees'));
+        return view('projects.show', compact('project', 'role', 'stats', 'employees', 'rootTasks'));
     }
 
     // ── Cập nhật project ─────────────────────────────────────────────────

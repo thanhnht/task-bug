@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Admin\AdminUserController;
-use App\Http\Controllers\{ProjectController, StoryController};
+use App\Http\Controllers\{ProjectController, TaskController};
 
 // ─── Public routes (chưa đăng nhập) ─────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -60,20 +60,23 @@ Route::middleware(['auth', 'account.active'])->group(function () {
             Route::patch('/members/role',       [ProjectController::class, 'updateMemberRole'])->name('members.update-role');
 
             // ══════════════════════════════════════════════════════════════
-            // STORIES (nested under project)
+            // TASKS (nested under project)
             // ══════════════════════════════════════════════════════════════
-            Route::prefix('stories')->name('stories.')->group(function () {
+            Route::prefix('tasks')->name('tasks.')->group(function () {
 
-                Route::get('/',           [StoryController::class, 'index'])->name('index');
-                Route::get('/create',     [StoryController::class, 'create'])->name('create'); // PM only
-                Route::post('/',          [StoryController::class, 'store'])->name('store');
+                Route::get('/',       [TaskController::class, 'index'])->name('index');
+                Route::get('/create', [TaskController::class, 'create'])->name('create');
+                Route::post('/',      [TaskController::class, 'store'])->name('store');
 
-                Route::prefix('{story}')->group(function () {
-                    Route::get('/',          [StoryController::class, 'show'])->name('show');
-                    Route::patch('/',        [StoryController::class, 'update'])->name('update');
-                    Route::post('/transition', [StoryController::class, 'transition'])->name('transition');
+                Route::prefix('{task}')->group(function () {
+                    Route::get('/',            [TaskController::class, 'show'])->name('show');
+                    Route::patch('/',          [TaskController::class, 'update'])->name('update');
+                    Route::post('/transition', [TaskController::class, 'transition'])->name('transition');
+                    Route::patch('/progress',  [TaskController::class, 'updateProgress'])->name('progress');
 
-
+                    // Task con (bất kỳ thành viên tạo)
+                    Route::post('/children',                         [TaskController::class, 'storeChild'])->name('children.store');
+                    Route::post('/children/{child}/transition',      [TaskController::class, 'transitionChild'])->name('children.transition');
                 });
             });
         });

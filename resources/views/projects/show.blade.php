@@ -10,9 +10,9 @@
 
 @section('topbar-actions')
     @if($role === 'pm' || Auth::user()->isAdmin())
-        <a href="{{ route('projects.stories.create', $project) }}" class="btn btn-primary">
+        <a href="{{ route('projects.tasks.create', $project) }}" class="btn btn-primary">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M8 2v12M2 8h12"/></svg>
-            Tạo Story
+            Tạo Task
         </a>
     @endif
     @if(Auth::user()->isAdmin() || $role === 'pm')
@@ -30,7 +30,6 @@
     <div class="project-header-info">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
             <span class="mono-tag">{{ $project->code }}</span>
-            <span class="badge badge-status-{{ $project->status }}">{{ $project->statusLabel() }}</span>
             @if($role && $role !== 'admin')
                 <span class="role-tag role-{{ $role }}">{{ \App\Models\Project::ROLE_LABELS[$role] ?? $role }}</span>
             @elseif(Auth::user()->isAdmin())
@@ -48,12 +47,6 @@
                 Bắt đầu: {{ $project->start_date->format('d/m/Y') }}
             </div>
             @endif
-            @if($project->end_date)
-            <div class="meta-item">
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm1 3v4H5V7h3V4h1z"/></svg>
-                Deadline: <strong style="color:{{ $project->end_date->isPast() ? 'var(--red)' : 'var(--text-1)' }}">{{ $project->end_date->format('d/m/Y') }}</strong>
-            </div>
-            @endif
             <div class="meta-item">
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z"/></svg>
                 Tạo bởi: {{ $project->creator->full_name }}
@@ -61,27 +54,12 @@
         </div>
     </div>
 
-    {{-- Progress ring --}}
-    <div class="progress-ring-wrap">
-        @php $pct = $project->progressPercent(); @endphp
-        <svg class="progress-ring" viewBox="0 0 80 80">
-            <circle cx="40" cy="40" r="32" fill="none" stroke="var(--border)" stroke-width="6"/>
-            <circle cx="40" cy="40" r="32" fill="none"
-                stroke="var(--accent)" stroke-width="6"
-                stroke-linecap="round"
-                stroke-dasharray="{{ round(2 * 3.14159 * 32, 1) }}"
-                stroke-dashoffset="{{ round(2 * 3.14159 * 32 * (1 - $pct/100), 1) }}"
-                transform="rotate(-90 40 40)"/>
-            <text x="40" y="44" text-anchor="middle" font-family="monospace" font-size="14" font-weight="700" fill="var(--text-1)">{{ $pct }}%</text>
-        </svg>
-        <div class="progress-ring-label">Tiến độ</div>
-    </div>
 </div>
 
 {{-- ── Stats strip ─────────────────────────────────────────────────────── --}}
 <div class="stats-grid" style="margin-bottom:24px">
     <div class="stat-card blue">
-        <div class="stat-label">Tổng Story</div>
+        <div class="stat-label">Tổng Task</div>
         <div class="stat-value">{{ $stats['total'] }}</div>
     </div>
     <div class="stat-card" style="border-top-color:var(--text-3)">
@@ -93,7 +71,7 @@
         <div class="stat-value" style="font-size:22px">{{ $stats['progress'] }}</div>
     </div>
     <div class="stat-card" style="border-top-color:var(--yellow)">
-        <div class="stat-label">Ready Review</div>
+        <div class="stat-label">Ready to Test</div>
         <div class="stat-value" style="font-size:22px;color:var(--yellow)">{{ $stats['review'] }}</div>
     </div>
     <div class="stat-card green">
@@ -107,59 +85,81 @@
 {{-- ── Danh sách Story ─────────────────────────────────────────────────── --}}
 <div class="detail-main">
     <div class="card">
-        <div class="card-header">
-            <span class="card-title">Stories</span>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px">
+            <span class="card-title">Tasks</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
                 {{-- Status filter tabs --}}
-                @foreach([''=>'Tất cả','todo'=>'To Do','in_progress'=>'In Progress','ready_to_review'=>'Review','done'=>'Done'] as $val => $label)
-                <a href="{{ request()->fullUrlWithQuery(['status' => $val]) }}"
+                @foreach([''=>'Tất cả','todo'=>'To Do','in_progress'=>'In Progress','ready_to_test'=>'Ready to Test','done'=>'Done'] as $val => $label)
+                <a href="{{ request()->fullUrlWithQuery(['status' => $val, 'type' => request('type', '')]) }}"
                    class="filter-tab {{ request('status', '') == $val ? 'active' : '' }}">
                     {{ $label }}
                 </a>
                 @endforeach
+
+                {{-- Type dropdown --}}
+                <select id="typeFilter" class="form-control" style="width:130px;font-size:12px;padding:4px 8px;height:auto">
+                    <option value="">Tất cả loại</option>
+                    @foreach(\App\Models\Task::TYPE_LABELS as $val => $label)
+                        <option value="{{ $val }}" {{ request('type') === $val ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
+                </select>
             </div>
         </div>
 
-        @if($project->stories->isEmpty())
+        @if($rootTasks->isEmpty())
         <div style="padding:48px;text-align:center;color:var(--text-3)">
             @if($role === 'pm' || Auth::user()->isAdmin())
-                Chưa có Story nào. <a href="{{ route('projects.stories.create', $project) }}" style="color:var(--accent)">Tạo Story đầu tiên</a>
+                Chưa có Task nào. <a href="{{ route('projects.tasks.create', $project) }}" style="color:var(--accent)">Tạo Task đầu tiên</a>
             @else
-                Chưa có Story nào được tạo.
+                Chưa có Task nào được tạo.
             @endif
         </div>
         @else
         <div class="story-list">
-            @foreach($project->stories as $story)
-            <a href="{{ route('projects.stories.show', [$project, $story]) }}" class="story-row">
+            @foreach($rootTasks as $task)
+            <a href="{{ route('projects.tasks.show', [$project, $task]) }}" class="story-row">
                 <div class="story-row-left">
-                    <span class="story-code">{{ $story->code }}</span>
-                    <div>
-                        <div class="story-title">{{ $story->title }}</div>
+                    <span class="story-code">{{ $task->code }}</span>
+                    <span class="type-chip-xs type-{{ $task->type }}">{{ $task->typeLabel() }}</span>
+                    <div style="min-width:0;flex:1">
+                        <div class="story-title">{{ $task->title }}</div>
                         <div class="story-meta">
-                            @if($story->developer)
+                            @if($task->assignee)
                                 <span>
                                     <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
-                                    {{ $story->developer->full_name }}
+                                    {{ $task->assignee->full_name }}
                                 </span>
                             @else
                                 <span style="color:var(--text-3)">Chưa phân công</span>
                             @endif
-                            @if($story->updated_at)
-                            <span>{{ $story->updated_at->diffForHumans() }}</span>
+                            @if($task->due_date)
+                                <span style="{{ $task->due_date->isPast() && $task->status !== 'done' ? 'color:var(--red)' : '' }}">
+                                    <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1v1H2a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-2V1h-2v1H6V1H4zm8 3H4v1h8V4z"/></svg>
+                                    {{ $task->due_date->format('d/m/Y') }}
+                                </span>
                             @endif
+                            @if($task->children_count > 0)
+                                @php $doneCnt = $task->children_count - $task->pending_children_count; @endphp
+                                <span style="{{ $task->pending_children_count > 0 ? 'color:var(--yellow)' : 'color:var(--green)' }}">
+                                    {{ $doneCnt }}/{{ $task->children_count }} xong
+                                </span>
+                            @endif
+                            <span>{{ $task->updated_at->diffForHumans() }}</span>
                         </div>
+                        @if($task->children_count > 0)
+                            @php
+                                $miniPct = (int) round(($task->children_count - $task->pending_children_count) / $task->children_count * 100);
+                            @endphp
+                            <div class="mini-progress-track" style="margin-top:6px">
+                                <div class="mini-progress-fill {{ $miniPct === 100 ? 'done' : '' }}"
+                                     style="width:{{ $miniPct }}%"></div>
+                            </div>
+                        @endif
                     </div>
                 </div>
                 <div class="story-row-right">
-                    @if($story->open_bugs_count > 0)
-                    <span class="mini-badge red">
-                        <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-1 4h2v5H7V5zm0 6h2v2H7v-2z"/></svg>
-                        {{ $story->open_bugs_count }} bugs
-                    </span>
-                    @endif
-                    <span class="priority-dot priority-{{ $story->priority }}" title="{{ $story->priorityLabel() }}"></span>
-                    <span class="status-pill status-{{ $story->status }}">{{ $story->statusLabel() }}</span>
+                    <span class="priority-dot priority-{{ $task->priority }}" title="{{ $task->priorityLabel() }}"></span>
+                    <span class="status-pill status-{{ $task->status }}">{{ $task->statusLabel() }}</span>
                 </div>
             </a>
             @endforeach
@@ -256,10 +256,6 @@
 @push('styles')
 <style>
     .project-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 24px;
         margin-bottom: 24px;
         background: var(--bg-1);
         border: 1px solid var(--border);
@@ -271,11 +267,7 @@
     .meta-item { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--text-2); }
     .mono-tag { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); }
 
-    .progress-ring-wrap { text-align: center; flex-shrink: 0; }
-    .progress-ring { width: 80px; height: 80px; }
-    .progress-ring-label { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); margin-top: 4px; }
-
-    .detail-layout { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
+.detail-layout { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
 
     /* Filter tabs */
     .filter-tab {
@@ -287,9 +279,21 @@
         text-decoration: none;
         transition: all .12s;
         border: 1px solid transparent;
+        white-space: nowrap;
     }
     .filter-tab:hover  { color: var(--text-2); background: var(--bg-2); }
     .filter-tab.active { color: var(--accent); background: var(--accent-glow); border-color: var(--accent-dim); }
+
+.type-chip-xs {
+        font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+        padding: 1px 5px; border-radius: 3px; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
+    }
+    .type-chip-xs.type-task     { background:rgba(59,130,246,.15);  color:var(--blue); }
+    .type-chip-xs.type-subtask  { background:rgba(100,116,139,.15); color:var(--text-2); }
+    .type-chip-xs.type-bug      { background:rgba(239,68,68,.12);   color:var(--red); }
+    .type-chip-xs.type-research { background:rgba(168,85,247,.12);  color:#a855f7; }
+    .type-chip-xs.type-fix      { background:rgba(249,115,22,.12);  color:var(--accent); }
+    .type-chip-xs.type-test     { background:rgba(34,197,94,.12);   color:var(--green); }
 
     /* Story list */
     .story-list { display: flex; flex-direction: column; }
@@ -327,6 +331,15 @@
     }
     .mini-badge.red { background: rgba(239,68,68,.1); color: var(--red); }
 
+    .mini-progress-track {
+        height: 3px; background: var(--bg-3); border-radius: 2px; overflow: hidden; width: 100%;
+    }
+    .mini-progress-fill {
+        height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s;
+        min-width: 2px;
+    }
+    .mini-progress-fill.done { background: var(--green); }
+
     .priority-dot {
         width: 8px; height: 8px; border-radius: 50%;
     }
@@ -341,7 +354,7 @@
     }
     .status-pill.status-todo            { background: var(--bg-3); color: var(--text-3); }
     .status-pill.status-in_progress     { background: rgba(249,115,22,.15); color: var(--accent); }
-    .status-pill.status-ready_to_review { background: rgba(234,179,8,.12); color: var(--yellow); }
+    .status-pill.status-ready_to_test { background: rgba(234,179,8,.12); color: var(--yellow); }
     .status-pill.status-done            { background: rgba(34,197,94,.12); color: var(--green); }
 
     /* Members sidebar */
@@ -382,4 +395,15 @@
         .project-header { flex-direction: column; }
     }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+    document.getElementById('typeFilter').addEventListener('change', function () {
+        const url = new URL(window.location.href);
+        url.searchParams.set('type', this.value);
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    });
+</script>
 @endpush

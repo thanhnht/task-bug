@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\{HasMany, BelongsTo, BelongsToMany};
 
+
 class Project extends Model
 {
     // ── Constants ──────────────────────────────────────────────────────────
@@ -47,9 +48,15 @@ class Project extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function stories(): HasMany
+    public function tasks(): HasMany
     {
-        return $this->hasMany(Story::class);
+        return $this->hasMany(Task::class);
+    }
+
+    /** Chỉ lấy task gốc (không có parent) */
+    public function rootTasks(): HasMany
+    {
+        return $this->hasMany(Task::class)->whereNull('parent_id');
     }
 
     /**
@@ -72,6 +79,11 @@ class Project extends Model
     public function pms(): BelongsToMany       { return $this->membersWithRole(self::ROLE_PM); }
     public function developers(): BelongsToMany { return $this->membersWithRole(self::ROLE_DEVELOPER); }
     public function testers(): BelongsToMany    { return $this->membersWithRole(self::ROLE_TESTER); }
+
+    public function hasTesters(): bool
+    {
+        return $this->members()->wherePivot('role', self::ROLE_TESTER)->exists();
+    }
 
     // ── Permission helpers ─────────────────────────────────────────────────
 
@@ -133,10 +145,10 @@ class Project extends Model
 
     public function progressPercent(): int
     {
-        $total = $this->stories()->count();
+        $total = $this->rootTasks()->count();
         if ($total === 0) return 0;
 
-        $done = $this->stories()->where('status', Story::STATUS_DONE)->count();
+        $done = $this->rootTasks()->where('status', Task::STATUS_DONE)->count();
         return (int) round($done / $total * 100);
     }
 }

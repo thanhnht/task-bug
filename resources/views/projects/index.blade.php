@@ -43,59 +43,32 @@
 {{-- Project grid --}}
 <div class="project-grid">
     @foreach($projects as $project)
-    @php
-        $role     = $project->roleOf(Auth::user());
-        $progress = $project->progressPercent();
-        $pmList   = $project->pms->take(2);
-    @endphp
+    @php $role = $project->roleOf(Auth::user()); @endphp
 
     <a href="{{ route('projects.show', $project) }}" class="project-card">
-        {{-- Top bar color by status --}}
-        <div class="project-card-bar status-{{ $project->status }}"></div>
-
         <div class="project-card-head">
             <div>
                 <span class="project-code">{{ $project->code }}</span>
                 <h3 class="project-name">{{ $project->name }}</h3>
             </div>
-            <span class="badge badge-status-{{ $project->status }}">{{ $project->statusLabel() }}</span>
         </div>
 
         @if($project->description)
         <p class="project-desc">{{ Str::limit($project->description, 80) }}</p>
         @endif
 
-        {{-- Progress bar --}}
-        <div class="project-progress">
-            <div class="project-progress-track">
-                <div class="project-progress-fill" style="width: {{ $progress }}%"></div>
-            </div>
-            <span class="project-progress-label">{{ $progress }}%</span>
-        </div>
-
         <div class="project-card-footer">
-            {{-- Story counts --}}
             <div class="project-meta">
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v1H2V2zm0 3h12v1H2V5zm0 3h8v1H2V8zm0 3h10v1H2v-1z"/></svg>
-                {{ $project->stories_count }} stories
+                {{ $project->root_tasks_count }} tasks
             </div>
 
-            {{-- My role badge --}}
             @if($role && $role !== 'admin')
-
             <span class="role-tag role-{{ $role }}">
                 {{ \App\Models\Project::ROLE_LABELS[$role] ?? $role }}
             </span>
             @elseif($role === 'admin')
             <span class="role-tag role-admin">Admin</span>
-            @endif
-
-            {{-- Date --}}
-            @if($project->end_date)
-            <div class="project-meta" style="margin-left:auto">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1v2H1v12h14V3h-2V1h-2v2H5V1H3zm10 4v8H3V5h10z"/></svg>
-                {{ $project->end_date->format('d/m/Y') }}
-            </div>
             @endif
         </div>
     </a>
@@ -140,17 +113,7 @@
         transform: translateY(-2px);
         box-shadow: 0 8px 24px rgba(0,0,0,.35);
     }
-    .project-card-bar {
-        position: absolute;
-        top: 0; left: 0; right: 0;
-        height: 3px;
-    }
-    .project-card-bar.status-active    { background: var(--green); }
-    .project-card-bar.status-on_hold   { background: var(--yellow); }
-    .project-card-bar.status-completed { background: var(--blue); }
-    .project-card-bar.status-archived  { background: var(--text-3); }
-
-    .project-card-head {
+.project-card-head {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
@@ -177,30 +140,7 @@
         line-height: 1.5;
     }
 
-    /* Progress */
-    .project-progress { display: flex; align-items: center; gap: 10px; }
-    .project-progress-track {
-        flex: 1;
-        height: 4px;
-        background: var(--border);
-        border-radius: 2px;
-        overflow: hidden;
-    }
-    .project-progress-fill {
-        height: 100%;
-        background: var(--accent);
-        border-radius: 2px;
-        transition: width .4s ease;
-    }
-    .project-progress-label {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--text-3);
-        min-width: 32px;
-        text-align: right;
-    }
-
-    .project-card-footer {
+.project-card-footer {
         display: flex;
         align-items: center;
         gap: 10px;
@@ -232,13 +172,7 @@
     .role-tag.role-tester    { background: rgba(34,197,94,.15);   color: var(--green); }
     .role-tag.role-admin     { background: rgba(239,68,68,.12);   color: var(--red); }
 
-    /* Status badges */
-    .badge-status-active    { background: rgba(34,197,94,.15);  color: var(--green); }
-    .badge-status-on_hold   { background: rgba(234,179,8,.12);  color: var(--yellow); }
-    .badge-status-completed { background: rgba(59,130,246,.15); color: var(--blue); }
-    .badge-status-archived  { background: rgba(100,116,139,.15);color: var(--text-3); }
-
-    /* Empty state */
+/* Empty state */
     .empty-state {
         text-align: center;
         padding: 80px 24px;
