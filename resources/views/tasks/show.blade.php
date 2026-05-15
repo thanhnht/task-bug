@@ -85,43 +85,9 @@
 
         {{-- Progress bar --}}
         @php
-            $totalChildren    = $task->children->count();
-            $nonBugChildren   = $task->children->where('type', '!=', 'bug')->count();
-            $doneChildren     = $task->children->where('status', 'done')->count();
+            $nonBugChildren = $task->children->where('type', '!=', 'bug')->count();
+            $doneChildren   = $task->children->where('status', 'done')->count();
         @endphp
-        <div class="progress-section">
-            <div class="progress-label">
-                <span>
-                    Tiến độ
-                    @if ($totalChildren > 0)
-                        <span style="font-weight:400;color:var(--text-3)">({{ $doneChildren }}/{{ $totalChildren }} task con)</span>
-                    @elseif ($task->manual_progress !== null)
-                        <span style="font-weight:400;color:var(--text-3)">(thủ công)</span>
-                    @endif
-                </span>
-                <span class="progress-pct {{ $progress === 100 ? 'progress-done' : '' }}">{{ $progress }}%</span>
-            </div>
-            <div class="progress-bar-track">
-                <div class="progress-bar-fill {{ $progress === 100 ? 'progress-done' : '' }}"
-                     style="width:{{ $progress }}%"></div>
-            </div>
-            @if ($nonBugChildren === 0 && $task->status !== 'done')
-                {{-- Không có task con: cho cập nhật % thủ công từng ngày --}}
-                <form method="POST" action="{{ route('projects.tasks.progress', [$project, $task]) }}"
-                      style="margin-top:10px">
-                    @csrf @method('PATCH')
-                    <div style="font-size:11px;color:var(--text-3);margin-bottom:5px">Cập nhật tiến độ hôm nay:</div>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap">
-                        @foreach ([0,10,20,30,40,50,60,70,80,90,100] as $pval)
-                            <button type="submit" name="progress" value="{{ $pval }}"
-                                class="pct-btn {{ (int)$task->manual_progress === $pval ? 'pct-btn-active' : '' }}">
-                                {{ $pval }}%
-                            </button>
-                        @endforeach
-                    </div>
-                </form>
-            @endif
-        </div>
 
         {{-- ── Status pipeline ──────────────────────────────────────────────── --}}
         <div class="pipeline">
@@ -137,7 +103,7 @@
             @endphp
 
             @foreach ($steps as $i => $step)
-                <div class="pipeline-step {{ $i < $currentIdx ? 'done' : ($i === $currentIdx ? 'active' : 'pending') }}">
+                <div class="pipeline-step {{ ($i < $currentIdx || ($i === $currentIdx && $task->status === 'done')) ? 'done' : ($i === $currentIdx ? 'active' : 'pending') }}">
                     <div class="pipeline-dot">
                         @if ($i < $currentIdx)
                             <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
@@ -169,21 +135,27 @@
             $pendingNonBugChildren = $task->children->where('type', '!=', 'bug')->whereNotIn('status', ['done'])->count();
         @endphp
 
-        @if ($nonBugChildren > 0)
-            {{-- Có con không phải bug: trạng thái tự động quản lý --}}
+        @if ($pendingNonBugChildren > 0)
+            {{-- Còn con chưa xong: chỉ hiện banner thông tin --}}
             <div class="auto-status-info">
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.75 3.5h1.5v5h-1.5v-5zm0 6.5h1.5v1.5h-1.5V11z"/>
                 </svg>
-                Trạng thái tự động cập nhật từ task con.
-                @if ($pendingNonBugChildren > 0)
-                    Còn <strong>{{ $pendingNonBugChildren }}</strong> task con chưa xong.
-                @else
-                    <span style="color:var(--green)">Tất cả task con đã hoàn thành.</span>
-                @endif
+                Còn <strong>{{ $pendingNonBugChildren }}</strong> task con chưa hoàn thành.
             </div>
         @else
-            {{-- Chỉ có bug hoặc không có con: cho phép chuyển thủ công --}}
+            {{-- Tất cả con done (hoặc không có con): hiện form chuyển trạng thái --}}
+            @if ($nonBugChildren > 0)
+                <div class="auto-status-info" style="background:rgba(22,163,74,.07);border-color:rgba(22,163,74,.25);color:var(--green);margin-bottom:10px">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M3.5 8.5 6 11l6.5-6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+                    </svg>
+                    Tất cả task con đã hoàn thành.
+                    @if ($role === 'pm' || Auth::user()->isAdmin())
+                        PM xác nhận để chuyển Done.
+                    @endif
+                </div>
+            @endif
             <div class="transition-bar">
                 <form method="POST" action="{{ route('projects.tasks.transition', [$project, $task]) }}"
                       style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;width:100%">
@@ -193,6 +165,9 @@
                         <select name="status" class="form-control" style="width:200px">
                             @foreach (\App\Models\Task::STATUS_LABELS as $val => $label)
                                 @if ($val !== $task->status)
+                                    @if ($val === 'done' && $role !== 'pm' && !Auth::user()->isAdmin())
+                                        @continue
+                                    @endif
                                     <option value="{{ $val }}">{{ $label }}</option>
                                 @endif
                             @endforeach
@@ -322,7 +297,7 @@
             </button>
         </div>
 
-        <div id="childForm" style="display:none;padding:16px;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;background:var(--bg-0)">
+        <div id="childForm" style="display:none;padding:16px;border:1px solid var(--border);border-radius:6px;margin-bottom:12px;background:var(--bg-2)">
             <form method="POST" action="{{ route('projects.tasks.children.store', [$project, $task]) }}">
                 @csrf
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -478,16 +453,6 @@
 
 @push('styles')
 <style>
-    /* Progress % buttons */
-    .pct-btn {
-        font-family: var(--font-mono); font-size: 11px; font-weight: 600;
-        padding: 3px 8px; border-radius: 4px; cursor: pointer;
-        border: 1px solid var(--border); background: var(--bg-2); color: var(--text-3);
-        transition: all .12s;
-    }
-    .pct-btn:hover    { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
-    .pct-btn-active   { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
-
     /* Progress bar */
     .task-info-row {
         display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -499,24 +464,9 @@
         background: var(--bg-2); border: 1px solid var(--border);
         border-radius: 4px; padding: 3px 8px;
     }
-    .info-badge.info-badge-overdue { color: var(--red); border-color: rgba(239,68,68,.3); background: rgba(239,68,68,.08); }
+    .info-badge.info-badge-overdue { color: var(--red); border-color: rgba(220,38,38,.25); background: rgba(220,38,38,.06); }
 
-    .progress-section { margin-bottom: 16px; }
-    .progress-label {
-        display: flex; justify-content: space-between; align-items: center;
-        font-size: 12px; color: var(--text-3); margin-bottom: 6px;
-    }
-    .progress-pct { font-family: var(--font-mono); font-weight: 700; color: var(--accent); }
-    .progress-pct.progress-done { color: var(--green); }
-    .progress-bar-track {
-        height: 6px; background: var(--bg-2); border-radius: 3px; overflow: hidden;
-    }
-    .progress-bar-fill {
-        height: 100%; background: var(--accent); border-radius: 3px; transition: width .4s ease;
-    }
-    .progress-bar-fill.progress-done { background: var(--green); }
-
-    .child-meta {
+.child-meta {
         font-size: 11px; color: var(--text-3); white-space: nowrap;
     }
     .child-meta.overdue { color: var(--red); }
@@ -528,6 +478,7 @@
         border-radius: 8px;
         padding: 24px;
         margin-bottom: 20px;
+        box-shadow: var(--shadow-sm);
     }
 
     .task-meta-top {
@@ -539,8 +490,8 @@
     }
 
     .task-code-lg  { font-family:var(--font-mono); font-size:12px; color:var(--text-3); }
-    .task-title-lg { font-family:var(--font-mono); font-size:20px; font-weight:700; margin-bottom:8px; }
-    .task-desc-lg  { font-size:13.5px; color:var(--text-2); line-height:1.7; margin-bottom:16px; }
+    .task-title-lg { font-size:20px; font-weight:700; margin-bottom:8px; color:var(--text-1); }
+    .task-desc-lg  { font-size:14.5px; color:var(--text-2); line-height:1.75; margin-bottom:16px; }
 
     /* Type chips */
     .type-chip {
@@ -553,12 +504,12 @@
         letter-spacing: .04em;
     }
 
-    .type-chip.type-task     { background:rgba(59,130,246,.15);  color:var(--blue); }
-    .type-chip.type-subtask  { background:rgba(100,116,139,.15); color:var(--text-2); }
-    .type-chip.type-bug      { background:rgba(239,68,68,.12);   color:var(--red); }
-    .type-chip.type-research { background:rgba(168,85,247,.12);  color:#a855f7; }
-    .type-chip.type-fix      { background:rgba(249,115,22,.12);  color:var(--accent); }
-    .type-chip.type-test     { background:rgba(34,197,94,.12);   color:var(--green); }
+    .type-chip.type-task     { background:rgba(37,99,235,.12);   color:var(--blue); }
+    .type-chip.type-subtask  { background:rgba(100,116,139,.12); color:var(--text-2); }
+    .type-chip.type-bug      { background:rgba(220,38,38,.10);   color:var(--red); }
+    .type-chip.type-research { background:rgba(168,85,247,.10);  color:#7c3aed; }
+    .type-chip.type-fix      { background:rgba(249,115,22,.10);  color:var(--accent); }
+    .type-chip.type-test     { background:rgba(22,163,74,.10);   color:var(--green); }
 
     .type-chip-sm {
         font-family: var(--font-mono);
@@ -570,22 +521,22 @@
         white-space: nowrap;
     }
 
-    .type-chip-sm.type-task     { background:rgba(59,130,246,.15);  color:var(--blue); }
-    .type-chip-sm.type-subtask  { background:rgba(100,116,139,.15); color:var(--text-2); }
-    .type-chip-sm.type-bug      { background:rgba(239,68,68,.12);   color:var(--red); }
-    .type-chip-sm.type-research { background:rgba(168,85,247,.12);  color:#a855f7; }
-    .type-chip-sm.type-fix      { background:rgba(249,115,22,.12);  color:var(--accent); }
-    .type-chip-sm.type-test     { background:rgba(34,197,94,.12);   color:var(--green); }
+    .type-chip-sm.type-task     { background:rgba(37,99,235,.12);   color:var(--blue); }
+    .type-chip-sm.type-subtask  { background:rgba(100,116,139,.12); color:var(--text-2); }
+    .type-chip-sm.type-bug      { background:rgba(220,38,38,.10);   color:var(--red); }
+    .type-chip-sm.type-research { background:rgba(168,85,247,.10);  color:#7c3aed; }
+    .type-chip-sm.type-fix      { background:rgba(249,115,22,.10);  color:var(--accent); }
+    .type-chip-sm.type-test     { background:rgba(22,163,74,.10);   color:var(--green); }
 
     /* Priority chips */
     .priority-chip {
         font-family:var(--font-mono); font-size:10px; font-weight:700;
         padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:.06em;
     }
-    .priority-chip.priority-low      { background:rgba(100,116,139,.15); color:var(--text-3); }
-    .priority-chip.priority-medium   { background:rgba(59,130,246,.15);  color:var(--blue); }
-    .priority-chip.priority-high     { background:rgba(234,179,8,.12);   color:var(--yellow); }
-    .priority-chip.priority-critical { background:rgba(239,68,68,.12);   color:var(--red); }
+    .priority-chip.priority-low      { background:rgba(100,116,139,.12); color:var(--text-2); }
+    .priority-chip.priority-medium   { background:rgba(37,99,235,.12);   color:var(--blue); }
+    .priority-chip.priority-high     { background:rgba(180,83,9,.10);    color:var(--yellow); }
+    .priority-chip.priority-critical { background:rgba(220,38,38,.10);   color:var(--red); }
 
     .assignee-chip { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text-2); }
 
@@ -594,7 +545,7 @@
     .pipeline-step { display:flex; flex-direction:column; align-items:center; position:relative; }
     .pipeline-dot {
         width:22px; height:22px; border-radius:50%;
-        border:2px solid var(--border); background:var(--bg-0);
+        border:2px solid var(--border); background:var(--bg-1);
         display:grid; place-items:center; z-index:1; flex-shrink:0;
     }
     .pipeline-step.done   .pipeline-dot { background:var(--green);  border-color:var(--green); }
@@ -612,13 +563,13 @@
     .auto-status-info {
         display:flex; align-items:center; gap:8px; padding:9px 14px;
         border-radius:6px; font-size:12.5px; margin-top:12px;
-        background:rgba(59,130,246,.06); border:1px solid rgba(59,130,246,.18); color:var(--blue);
+        background:rgba(37,99,235,.06); border:1px solid rgba(37,99,235,.2); color:var(--blue);
     }
 
     .info-strip {
         display:flex; align-items:center; gap:8px; padding:9px 14px;
         border-radius:6px; font-size:13px; margin-top:12px;
-        background:rgba(234,179,8,.08); border:1px solid rgba(234,179,8,.2); color:var(--yellow);
+        background:rgba(217,119,6,.06); border:1px solid rgba(217,119,6,.2); color:var(--yellow);
     }
 
     /* Tabs */
@@ -660,7 +611,7 @@
 
     .child-left { display:flex; align-items:center; gap:8px; min-width:0; flex:1; }
     .child-code     { font-family:var(--font-mono); font-size:11px; color:var(--text-3); white-space:nowrap; }
-    .child-title    { font-size:13.5px; }
+    .child-title    { font-size:14px; }
     .child-title.done-text { text-decoration:line-through; color:var(--text-3); }
     .child-assignee { font-size:11px; color:var(--text-3); white-space:nowrap; }
 
@@ -671,9 +622,6 @@
     .history-note  { font-size:13px; color:var(--text-2); margin-bottom:4px; }
     .history-meta  { font-size:12px; color:var(--text-3); }
 
-    .alert { padding:10px 14px; border-radius:6px; font-size:13px; }
-    .alert-success { background:rgba(34,197,94,.1);  border:1px solid rgba(34,197,94,.25); color:var(--green); }
-    .alert-danger  { background:rgba(239,68,68,.1);  border:1px solid rgba(239,68,68,.25);  color:var(--red); }
 </style>
 @endpush
 

@@ -111,7 +111,7 @@
     .project-card:hover {
         border-color: var(--border-lit);
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0,0,0,.35);
+        box-shadow: 0 6px 20px rgba(0,0,0,.08);
     }
 .project-card-head {
         display: flex;
@@ -156,21 +156,6 @@
         font-size: 12px;
         color: var(--text-3);
     }
-
-    /* Role tags */
-    .role-tag {
-        font-family: var(--font-mono);
-        font-size: 10px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .08em;
-        padding: 2px 7px;
-        border-radius: 3px;
-    }
-    .role-tag.role-pm        { background: rgba(249,115,22,.15); color: var(--accent); }
-    .role-tag.role-developer { background: rgba(59,130,246,.15);  color: var(--blue); }
-    .role-tag.role-tester    { background: rgba(34,197,94,.15);   color: var(--green); }
-    .role-tag.role-admin     { background: rgba(239,68,68,.12);   color: var(--red); }
 
 /* Empty state */
     .empty-state {

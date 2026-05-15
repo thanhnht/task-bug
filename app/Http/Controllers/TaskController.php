@@ -259,26 +259,6 @@ class TaskController extends Controller
         return back()->with('success', $result['message']);
     }
 
-    // ── Cập nhật tiến độ thủ công ─────────────────────────────────────────
-    public function updateProgress(Request $request, Project $project, Task $task)
-    {
-        $this->mustBeMember($project);
-        abort_if($task->project_id !== $project->id, 404);
-
-        $request->validate(['progress' => 'required|integer|min:0|max:100']);
-
-        $task->update(['manual_progress' => $request->progress]);
-
-        $task->histories()->create([
-            'from_status' => $task->status,
-            'to_status'   => $task->status,
-            'note'        => "Cập nhật tiến độ: {$request->progress}%",
-            'changed_by'  => Auth::id(),
-        ]);
-
-        return back()->with('success', "Đã cập nhật tiến độ: <strong>{$request->progress}%</strong>");
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────
     private function mustBeMember(Project $project): void
     {

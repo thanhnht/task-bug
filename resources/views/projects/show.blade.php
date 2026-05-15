@@ -138,23 +138,8 @@
                                     {{ $task->due_date->format('d/m/Y') }}
                                 </span>
                             @endif
-                            @if($task->children_count > 0)
-                                @php $doneCnt = $task->children_count - $task->pending_children_count; @endphp
-                                <span style="{{ $task->pending_children_count > 0 ? 'color:var(--yellow)' : 'color:var(--green)' }}">
-                                    {{ $doneCnt }}/{{ $task->children_count }} xong
-                                </span>
-                            @endif
                             <span>{{ $task->updated_at->diffForHumans() }}</span>
                         </div>
-                        @if($task->children_count > 0)
-                            @php
-                                $miniPct = (int) round(($task->children_count - $task->pending_children_count) / $task->children_count * 100);
-                            @endphp
-                            <div class="mini-progress-track" style="margin-top:6px">
-                                <div class="mini-progress-fill {{ $miniPct === 100 ? 'done' : '' }}"
-                                     style="width:{{ $miniPct }}%"></div>
-                            </div>
-                        @endif
                     </div>
                 </div>
                 <div class="story-row-right">
@@ -261,9 +246,10 @@
         border: 1px solid var(--border);
         border-radius: 8px;
         padding: 24px;
+        box-shadow: var(--shadow-sm);
     }
     .project-title { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--text-1); }
-    .project-description { font-size: 13.5px; color: var(--text-2); margin-top: 8px; line-height: 1.6; }
+    .project-description { font-size: 14.5px; color: var(--text-2); margin-top: 8px; line-height: 1.65; }
     .meta-item { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--text-2); }
     .mono-tag { font-family: var(--font-mono); font-size: 12px; color: var(--text-3); }
 
@@ -282,18 +268,7 @@
         white-space: nowrap;
     }
     .filter-tab:hover  { color: var(--text-2); background: var(--bg-2); }
-    .filter-tab.active { color: var(--accent); background: var(--accent-glow); border-color: var(--accent-dim); }
-
-.type-chip-xs {
-        font-family: var(--font-mono); font-size: 9px; font-weight: 700;
-        padding: 1px 5px; border-radius: 3px; text-transform: uppercase; white-space: nowrap; flex-shrink: 0;
-    }
-    .type-chip-xs.type-task     { background:rgba(59,130,246,.15);  color:var(--blue); }
-    .type-chip-xs.type-subtask  { background:rgba(100,116,139,.15); color:var(--text-2); }
-    .type-chip-xs.type-bug      { background:rgba(239,68,68,.12);   color:var(--red); }
-    .type-chip-xs.type-research { background:rgba(168,85,247,.12);  color:#a855f7; }
-    .type-chip-xs.type-fix      { background:rgba(249,115,22,.12);  color:var(--accent); }
-    .type-chip-xs.type-test     { background:rgba(34,197,94,.12);   color:var(--green); }
+    .filter-tab.active { color: var(--accent); background: var(--accent-glow); border-color: rgba(249,115,22,.3); }
 
     /* Story list */
     .story-list { display: flex; flex-direction: column; }
@@ -320,8 +295,8 @@
         white-space: nowrap;
         margin-top: 2px;
     }
-    .story-title { font-size: 13.5px; font-weight: 500; color: var(--text-1); }
-    .story-meta { font-size: 12px; color: var(--text-3); margin-top: 3px; display: flex; gap: 12px; }
+    .story-title { font-size: 14px; font-weight: 500; color: var(--text-1); }
+    .story-meta { font-size: 12.5px; color: var(--text-3); margin-top: 3px; display: flex; gap: 12px; }
     .story-meta span { display: flex; align-items: center; gap: 3px; }
     .story-row-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
@@ -329,33 +304,15 @@
         display: inline-flex; align-items: center; gap: 3px;
         font-size: 11px; font-family: var(--font-mono); padding: 2px 6px; border-radius: 3px;
     }
-    .mini-badge.red { background: rgba(239,68,68,.1); color: var(--red); }
+    .mini-badge.red { background: rgba(220,38,38,.08); color: var(--red); }
 
-    .mini-progress-track {
-        height: 3px; background: var(--bg-3); border-radius: 2px; overflow: hidden; width: 100%;
-    }
-    .mini-progress-fill {
-        height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s;
-        min-width: 2px;
-    }
-    .mini-progress-fill.done { background: var(--green); }
-
-    .priority-dot {
+.priority-dot {
         width: 8px; height: 8px; border-radius: 50%;
     }
-    .priority-dot.priority-low      { background: var(--text-3); }
+    .priority-dot.priority-low      { background: var(--border-lit); }
     .priority-dot.priority-medium   { background: var(--blue); }
     .priority-dot.priority-high     { background: var(--yellow); }
     .priority-dot.priority-critical { background: var(--red); }
-
-    .status-pill {
-        font-size: 11px; font-family: var(--font-mono); font-weight: 700;
-        letter-spacing: .04em; padding: 3px 8px; border-radius: 4px; white-space: nowrap;
-    }
-    .status-pill.status-todo            { background: var(--bg-3); color: var(--text-3); }
-    .status-pill.status-in_progress     { background: rgba(249,115,22,.15); color: var(--accent); }
-    .status-pill.status-ready_to_test { background: rgba(234,179,8,.12); color: var(--yellow); }
-    .status-pill.status-done            { background: rgba(34,197,94,.12); color: var(--green); }
 
     /* Members sidebar */
     .member-group { margin-bottom: 16px; }
@@ -376,19 +333,12 @@
         flex-shrink: 0;
     }
     .member-info { flex: 1; min-width: 0; }
-    .member-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .member-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* Role tag */
-    .role-tag { font-family: var(--font-mono); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 2px 7px; border-radius: 3px; }
-    .role-tag.role-pm        { background: rgba(249,115,22,.15); color: var(--accent); }
-    .role-tag.role-developer { background: rgba(59,130,246,.15);  color: var(--blue); }
-    .role-tag.role-tester    { background: rgba(34,197,94,.15);   color: var(--green); }
-    .role-tag.role-admin     { background: rgba(239,68,68,.12);   color: var(--red); }
-
-    .badge-status-active    { background: rgba(34,197,94,.15);  color: var(--green); font-family: var(--font-mono); font-size: 11px; font-weight:700; padding: 2px 8px; border-radius: 4px; }
-    .badge-status-on_hold   { background: rgba(234,179,8,.12);  color: var(--yellow); font-family: var(--font-mono); font-size: 11px; font-weight:700; padding: 2px 8px; border-radius: 4px; }
-    .badge-status-completed { background: rgba(59,130,246,.15); color: var(--blue); font-family: var(--font-mono); font-size: 11px; font-weight:700; padding: 2px 8px; border-radius: 4px; }
-    .badge-status-archived  { background: rgba(100,116,139,.15);color: var(--text-3); font-family: var(--font-mono); font-size: 11px; font-weight:700; padding: 2px 8px; border-radius: 4px; }
+    .badge-status-active    { background: rgba(22,163,74,.10);  color: var(--green);  font-family: var(--font-mono); font-size: 11px; font-weight:700; padding: 2px 8px; border-radius: 4px; }
+    .badge-status-on_hold   { background: rgba(180,83,9,.10);   color: var(--yellow); font-family: var(--font-mono); font-size: 11px; font-weight:700; padding: 2px 8px; border-radius: 4px; }
+    .badge-status-completed { background: rgba(37,99,235,.10);  color: var(--blue);   font-family: var(--font-mono); font-size: 11px; font-weight:700; padding: 2px 8px; border-radius: 4px; }
+    .badge-status-archived  { background: rgba(100,116,139,.10);color: var(--text-2); font-family: var(--font-mono); font-size: 11px; font-weight:700; padding: 2px 8px; border-radius: 4px; }
 
     @media (max-width: 900px) {
         .detail-layout { grid-template-columns: 1fr; }

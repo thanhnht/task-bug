@@ -55,7 +55,7 @@ class Task extends Model
     protected $fillable = [
         'code', 'project_id', 'parent_id', 'type',
         'title', 'description', 'priority', 'status',
-        'start_date', 'due_date', 'estimated_hours', 'manual_progress',
+        'start_date', 'due_date', 'estimated_hours',
         'created_by', 'assigned_to', 'confirmed_by',
         'started_at', 'ready_at', 'done_at',
     ];
@@ -128,6 +128,11 @@ class Task extends Model
         if ($newStatus === self::STATUS_DONE) {
             $check = $this->canBeDone();
             if (!$check['ok']) return $check;
+
+            $role = $this->project->roleOf($actor);
+            if (!$actor->isAdmin() && $role !== 'pm') {
+                return ['ok' => false, 'message' => 'Chỉ PM mới có thể xác nhận hoàn thành (Done).'];
+            }
         }
 
         $old     = $this->status;
@@ -188,13 +193,14 @@ class Task extends Model
         $newStatus = null;
         $note      = null;
 
-        if ($doneCount === $total && $old !== self::STATUS_DONE) {
-            $newStatus = self::STATUS_DONE;
-            $note      = 'Tự động: tất cả task con đã hoàn thành.';
+        if ($doneCount === $total && !in_array($old, [self::STATUS_READY_TO_TEST, self::STATUS_DONE])) {
+            // Tất cả con xong → chờ PM xác nhận
+            $newStatus = self::STATUS_READY_TO_TEST;
+            $note      = 'Tự động: tất cả task con đã hoàn thành, chờ PM xác nhận Done.';
         } elseif ($activeCount > 0 && $old === self::STATUS_TODO) {
             $newStatus = self::STATUS_IN_PROGRESS;
             $note      = 'Tự động: task con bắt đầu.';
-        } elseif ($doneCount < $total && $old === self::STATUS_DONE) {
+        } elseif ($doneCount < $total && in_array($old, [self::STATUS_DONE, self::STATUS_READY_TO_TEST])) {
             $newStatus = self::STATUS_IN_PROGRESS;
             $note      = 'Tự động: task con chưa hoàn thành đầy đủ, revert về In Progress.';
         }
@@ -205,11 +211,10 @@ class Task extends Model
         if ($newStatus === self::STATUS_IN_PROGRESS && $old === self::STATUS_TODO) {
             $updates['started_at'] = now();
         }
-        if ($newStatus === self::STATUS_DONE) {
-            $updates['done_at']      = now();
-            $updates['confirmed_by'] = $actor->id;
+        if ($newStatus === self::STATUS_READY_TO_TEST) {
+            $updates['ready_at'] = now();
         }
-        if ($newStatus !== self::STATUS_DONE && $old === self::STATUS_DONE) {
+        if ($old === self::STATUS_DONE && $newStatus !== self::STATUS_DONE) {
             $updates['done_at']      = null;
             $updates['confirmed_by'] = null;
         }
@@ -276,7 +281,6 @@ class Task extends Model
 
     /**
      * % hoàn thành.
-     * Có task con → tự tính từ con. Không có con → dùng manual_progress (nếu set) hoặc 0/100.
      */
     public function progressPercent(): int
     {
@@ -294,11 +298,12 @@ class Task extends Model
             }
         }
 
-        if ($this->manual_progress !== null) {
-            return (int) $this->manual_progress;
-        }
-
-        return $this->status === self::STATUS_DONE ? 100 : 0;
+        return match($this->status) {
+            self::STATUS_IN_PROGRESS   => 50,
+            self::STATUS_READY_TO_TEST => 80,
+            self::STATUS_DONE          => 100,
+            default                    => 0,
+        };
     }
 
     /** Trả về tất cả trạng thái có thể chuyển (tất cả trừ trạng thái hiện tại) */

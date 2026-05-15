@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Project, User, Task};
+use App\Models\{Project, User};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -83,8 +83,8 @@ class ProjectController extends Controller
             ->when($statusFilter, fn($q) => $q->where('status', $statusFilter))
             ->when($typeFilter,   fn($q) => $q->where('type', $typeFilter))
             ->withCount([
-                'children',
-                'children as pending_children_count' => fn($q) => $q->whereNotIn('status', ['done']),
+                'children as children_count'         => fn($q) => $q->where('type', '!=', 'bug'),
+                'children as pending_children_count' => fn($q) => $q->where('type', '!=', 'bug')->whereNotIn('status', ['done']),
             ])
             ->with('assignee')
             ->orderByDesc('created_at')
@@ -201,6 +201,7 @@ class ProjectController extends Controller
 
     private function mustBeAdminOrHaveRole(?Project $project, array $roles): void
     {
+        /** @var User $user */
         $user = Auth::user();
         if ($user->isAdmin()) return;
 

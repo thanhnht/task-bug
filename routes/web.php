@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Admin\AdminUserController;
-use App\Http\Controllers\{ProjectController, TaskController};
+use App\Http\Controllers\{ProjectController, TaskController, DashboardController};
 
 // ─── Public routes (chưa đăng nhập) ─────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -23,8 +23,8 @@ Route::middleware(['auth', 'account.active'])->group(function () {
     // ─── Routes yêu cầu đã đổi pass lần đầu ──────────────────────────────────
     Route::middleware('require.password.change')->group(function () {
 
-        // Dashboard nhân viên
-        Route::get('/dashboard', fn() => view('employee.dashboard'))->name('employee.dashboard');
+        // Dashboard
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('employee.dashboard');
 
         // ─── Admin only ───────────────────────────────────────────────────────
         Route::middleware('admin.only')->prefix('admin')->name('admin.')->group(function () {
@@ -72,8 +72,6 @@ Route::middleware(['auth', 'account.active'])->group(function () {
                     Route::get('/',            [TaskController::class, 'show'])->name('show');
                     Route::patch('/',          [TaskController::class, 'update'])->name('update');
                     Route::post('/transition', [TaskController::class, 'transition'])->name('transition');
-                    Route::patch('/progress',  [TaskController::class, 'updateProgress'])->name('progress');
-
                     // Task con (bất kỳ thành viên tạo)
                     Route::post('/children',                         [TaskController::class, 'storeChild'])->name('children.store');
                     Route::post('/children/{child}/transition',      [TaskController::class, 'transitionChild'])->name('children.transition');
