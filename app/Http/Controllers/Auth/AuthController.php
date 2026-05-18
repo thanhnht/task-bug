@@ -141,7 +141,7 @@ class AuthController extends Controller
             'is_first_login' => false,
         ]);
 
-        return redirect()->route('employee.dashboard')
+        return redirect()->route('projects.index')
                          ->with('success', 'Đổi mật khẩu thành công!');
     }
 
@@ -164,8 +164,6 @@ class AuthController extends Controller
 
     private function redirectByRole(User $user)
     {
-        return $user->isAdmin()
-            ? redirect()->route('admin.dashboard')
-            : redirect()->route('employee.dashboard');
+        return redirect()->route('projects.index');
     }
 }

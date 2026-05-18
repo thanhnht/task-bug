@@ -901,10 +901,43 @@
             letter-spacing: .04em; padding: 3px 8px; border-radius: 4px; white-space: nowrap;
             display: inline-block;
         }
-        .status-pill.status-todo          { background: var(--bg-3); color: var(--text-2); }
-        .status-pill.status-in_progress   { background: rgba(249,115,22,.12); color: var(--accent); }
-        .status-pill.status-ready_to_test { background: rgba(180,83,9,.10);   color: var(--yellow); }
-        .status-pill.status-done          { background: rgba(22,163,74,.10);  color: var(--green); }
+        .status-pill.status-todo            { background: var(--bg-3); color: var(--text-2); }
+        .status-pill.status-in_progress     { background: rgba(249,115,22,.12); color: var(--accent); }
+        .status-pill.status-ready_to_test   { background: rgba(180,83,9,.10);   color: var(--yellow); }
+        .status-pill.status-review_approved { background: rgba(37,99,235,.12);  color: var(--blue); }
+        .status-pill.status-done            { background: rgba(22,163,74,.10);  color: var(--green); }
+
+        /* ── Notification bell ─────────────────────────────────────────────── */
+        .notif-bell {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px; height: 34px;
+            border-radius: 8px;
+            color: var(--text-3);
+            text-decoration: none;
+            transition: background .15s, color .15s;
+        }
+        .notif-bell:hover { background: var(--bg-3); color: var(--text-1); }
+        .notif-bell svg { width: 18px; height: 18px; }
+        .notif-badge {
+            position: absolute;
+            top: 3px; right: 3px;
+            background: var(--red);
+            color: #fff;
+            font-size: 9px;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            min-width: 16px;
+            height: 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 3px;
+            line-height: 1;
+        }
 
         /* ── Type chips (xs) ───────────────────────────────────────────────── */
         .type-chip-xs {
@@ -950,7 +983,7 @@
 
         {{-- ── Sidebar ────────────────────────────────────────────────────────── --}}
         <aside class="sidebar">
-            <a href="{{ route('employee.dashboard') }}" class="sidebar-logo">
+            <a href="{{ route('projects.index') }}" class="sidebar-logo">
                 <div class="sidebar-logo-icon">
                     <svg viewBox="0 0 16 16">
                         <path d="M2 3h12v2H2V3zm0 4h8v2H2V7zm0 4h10v2H2v-2z" />
@@ -964,14 +997,6 @@
                 @if (Auth::user()->isAdmin())
                     <div class="sidebar-section">Admin</div>
 
-                    <a href="{{ route('admin.dashboard') }}"
-                        class="nav-item {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
-                        <svg viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M1 1h6v6H1V1zm8 0h6v6H9V1zM1 9h6v6H1V9zm8 0h6v6H9V9z" />
-                        </svg>
-                        Dashboard
-                    </a>
-
                     <a href="{{ route('admin.users.index') }}"
                         class="nav-item {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
                         <svg viewBox="0 0 16 16" fill="currentColor">
@@ -981,16 +1006,7 @@
                     </a>
 
                     <div class="sidebar-divider"></div>
-                    <div class="sidebar-section">Dự án</div>
                 @endif
-
-                <a href="{{ route('employee.dashboard') }}"
-                    class="nav-item {{ request()->routeIs('employee.dashboard') ? 'active' : '' }}">
-                    <svg viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M1 1h6v6H1V1zm8 0h6v6H9V1zM1 9h6v6H1V9zm8 0h6v6H9V9z" />
-                    </svg>
-                    Dashboard
-                </a>
 
                 <a href="{{ route('projects.index') }}"
                     class="nav-item {{ request()->routeIs('projects.*') ? 'active' : '' }}">
@@ -999,6 +1015,14 @@
                             d="M1.5 3A1.5 1.5 0 0 1 3 1.5h3l1 1h6A1.5 1.5 0 0 1 14.5 4v8A1.5 1.5 0 0 1 13 13.5H3A1.5 1.5 0 0 1 1.5 12V3z" />
                     </svg>
                     Projects
+                </a>
+
+                <a href="{{ route('quality.index') }}"
+                    class="nav-item {{ request()->routeIs('quality.*') ? 'active' : '' }}">
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M1 11l3-3 3 3 5-6 2 2-7 8-3-3-3 3z"/>
+                    </svg>
+                    Báo cáo
                 </a>
 
                 <div class="sidebar-divider"></div>
@@ -1047,6 +1071,17 @@
                 </div>
                 <div class="topbar-actions">
                     @yield('topbar-actions')
+                    @php
+                        $unreadNotifCount = \App\Models\UserNotification::where('user_id', Auth::id())->whereNull('read_at')->count();
+                    @endphp
+                    <a href="{{ route('notifications.index') }}" class="notif-bell" title="Thông báo">
+                        <svg viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 1a5 5 0 0 0-5 5v2.5l-1 1.5v1h12v-1l-1-1.5V6a5 5 0 0 0-5-5zm-1.5 11a1.5 1.5 0 0 0 3 0h-3z"/>
+                        </svg>
+                        @if ($unreadNotifCount > 0)
+                            <span class="notif-badge">{{ $unreadNotifCount > 99 ? '99+' : $unreadNotifCount }}</span>
+                        @endif
+                    </a>
                 </div>
             </header>
 

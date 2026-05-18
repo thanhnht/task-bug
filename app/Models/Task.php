@@ -24,19 +24,21 @@ class Task extends Model
     ];
 
     // ── Status ─────────────────────────────────────────────────────────────
-    const STATUS_TODO          = 'todo';
-    const STATUS_IN_PROGRESS   = 'in_progress';
-    const STATUS_READY_TO_TEST = 'ready_to_test';
-    const STATUS_DONE          = 'done';
+    const STATUS_TODO            = 'todo';
+    const STATUS_IN_PROGRESS     = 'in_progress';
+    const STATUS_READY_TO_TEST   = 'ready_to_test';
+    const STATUS_REVIEW_APPROVED = 'review_approved';
+    const STATUS_DONE            = 'done';
 
     const STATUS_LABELS = [
-        'todo'          => 'To Do',
-        'in_progress'   => 'In Progress',
-        'ready_to_test' => 'Ready to Test',
-        'done'          => 'Done',
+        'todo'            => 'To Do',
+        'in_progress'     => 'In Progress',
+        'ready_to_test'   => 'Ready to Test',
+        'review_approved' => 'Review Approved',
+        'done'            => 'Done',
     ];
 
-    const STATUS_ORDER = ['todo', 'in_progress', 'ready_to_test', 'done'];
+    const STATUS_ORDER = ['todo', 'in_progress', 'ready_to_test', 'review_approved', 'done'];
 
     // ── Priority ───────────────────────────────────────────────────────────
     const PRIORITY_LOW      = 'low';
@@ -98,10 +100,18 @@ class Task extends Model
 
     public function canBeDone(): array
     {
-        $pending = $this->children()->where('type', '!=', self::TYPE_BUG)
-                        ->whereNotIn('status', ['done'])->count();
-        if ($pending > 0) {
-            return ['ok' => false, 'message' => "Còn {$pending} task con chưa hoàn thành."];
+        if ($this->isMainTask()) {
+            // Story: all children including bugs must be done
+            $pending = $this->children()->whereNotIn('status', ['done'])->count();
+            if ($pending > 0) {
+                return ['ok' => false, 'message' => "Còn {$pending} task con (bao gồm Bug) chưa hoàn thành."];
+            }
+        } else {
+            $pending = $this->children()->where('type', '!=', self::TYPE_BUG)
+                            ->whereNotIn('status', ['done'])->count();
+            if ($pending > 0) {
+                return ['ok' => false, 'message' => "Còn {$pending} task con chưa hoàn thành."];
+            }
         }
         return ['ok' => true];
     }
@@ -125,13 +135,25 @@ class Task extends Model
             if (!$check['ok']) return $check;
         }
 
+        if ($newStatus === self::STATUS_REVIEW_APPROVED) {
+            $role = $this->project->roleOf($actor);
+            if (!$actor->isAdmin() && $role !== 'tester') {
+                return ['ok' => false, 'message' => 'Chỉ Tester mới có thể phê duyệt Review Approved.'];
+            }
+        }
+
         if ($newStatus === self::STATUS_DONE) {
+            // Story (root task) must pass through review_approved first
+            if ($this->isMainTask() && $this->status !== self::STATUS_REVIEW_APPROVED) {
+                return ['ok' => false, 'message' => 'Story phải được Tester phê duyệt (Review Approved) trước khi nghiệm thu Done.'];
+            }
+
             $check = $this->canBeDone();
             if (!$check['ok']) return $check;
 
             $role = $this->project->roleOf($actor);
-            if (!$actor->isAdmin() && $role !== 'pm') {
-                return ['ok' => false, 'message' => 'Chỉ PM mới có thể xác nhận hoàn thành (Done).'];
+            if (!$actor->isAdmin() && $role !== 'pm' && $role !== 'tester') {
+                return ['ok' => false, 'message' => 'Chỉ PM hoặc Tester mới có thể xác nhận hoàn thành (Done).'];
             }
         }
 
@@ -148,8 +170,8 @@ class Task extends Model
             $updates['done_at']      = Carbon::now();
             $updates['confirmed_by'] = $actor->id;
         }
-        // Revert từ done về trạng thái khác
-        if ($old === self::STATUS_DONE && $newStatus !== self::STATUS_DONE) {
+        // Revert từ done hoặc review_approved về trạng thái khác
+        if (in_array($old, [self::STATUS_DONE, self::STATUS_REVIEW_APPROVED]) && $newStatus !== self::STATUS_DONE) {
             $updates['done_at']      = null;
             $updates['confirmed_by'] = null;
         }
@@ -193,14 +215,14 @@ class Task extends Model
         $newStatus = null;
         $note      = null;
 
-        if ($doneCount === $total && !in_array($old, [self::STATUS_READY_TO_TEST, self::STATUS_DONE])) {
-            // Tất cả con xong → chờ PM xác nhận
+        if ($doneCount === $total && !in_array($old, [self::STATUS_READY_TO_TEST, self::STATUS_REVIEW_APPROVED, self::STATUS_DONE])) {
+            // Tất cả con xong → chờ Tester review
             $newStatus = self::STATUS_READY_TO_TEST;
-            $note      = 'Tự động: tất cả task con đã hoàn thành, chờ PM xác nhận Done.';
+            $note      = 'Tự động: tất cả task con đã hoàn thành, chờ Tester/PM xác nhận Done.';
         } elseif ($activeCount > 0 && $old === self::STATUS_TODO) {
             $newStatus = self::STATUS_IN_PROGRESS;
             $note      = 'Tự động: task con bắt đầu.';
-        } elseif ($doneCount < $total && in_array($old, [self::STATUS_DONE, self::STATUS_READY_TO_TEST])) {
+        } elseif ($doneCount < $total && in_array($old, [self::STATUS_DONE, self::STATUS_REVIEW_APPROVED, self::STATUS_READY_TO_TEST])) {
             $newStatus = self::STATUS_IN_PROGRESS;
             $note      = 'Tự động: task con chưa hoàn thành đầy đủ, revert về In Progress.';
         }
@@ -214,7 +236,7 @@ class Task extends Model
         if ($newStatus === self::STATUS_READY_TO_TEST) {
             $updates['ready_at'] = now();
         }
-        if ($old === self::STATUS_DONE && $newStatus !== self::STATUS_DONE) {
+        if (in_array($old, [self::STATUS_DONE, self::STATUS_REVIEW_APPROVED]) && $newStatus !== self::STATUS_DONE) {
             $updates['done_at']      = null;
             $updates['confirmed_by'] = null;
         }

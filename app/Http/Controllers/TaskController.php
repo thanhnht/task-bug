@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Project, Task, User};
+use App\Models\{Project, Task, User, UserNotification};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -21,10 +21,13 @@ class TaskController extends Controller
                 'children as pending_children_count' => fn($q) => $q->whereNotIn('status', ['done']),
             ]);
 
-        if ($request->filled('status'))   $query->where('status', $request->status);
-        if ($request->filled('priority')) $query->where('priority', $request->priority);
-        if ($request->filled('type'))     $query->where('type', $request->type);
-        if ($request->filled('search'))   $query->where(function ($q) use ($request) {
+        if ($request->filled('status'))      $query->where('status', $request->status);
+        if ($request->filled('priority'))    $query->where('priority', $request->priority);
+        if ($request->filled('type'))        $query->where('type', $request->type);
+        if ($request->filled('assigned_to')) $query->where('assigned_to', $request->assigned_to);
+        if ($request->filled('date_from'))   $query->whereDate('created_at', '>=', $request->date_from);
+        if ($request->filled('date_to'))     $query->whereDate('created_at', '<=', $request->date_to);
+        if ($request->filled('search'))      $query->where(function ($q) use ($request) {
             $q->where('title', 'like', "%{$request->search}%")
               ->orWhere('code', 'like', "%{$request->search}%");
         });
@@ -34,16 +37,17 @@ class TaskController extends Controller
             $query->where('assigned_to', Auth::id());
         }
 
-        $tasks = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $members = $project->members()->orderBy('full_name')->get();
+        $tasks   = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
 
-        return view('tasks.index', compact('project', 'tasks', 'role'));
+        return view('tasks.index', compact('project', 'tasks', 'role', 'members'));
     }
 
     // ── Tạo task chính ────────────────────────────────────────────────────
     public function create(Project $project)
     {
         $this->mustHaveRole($project, [Project::ROLE_PM]);
-        $members = $project->developers()->orderBy('full_name')->get();
+        $members = $project->members()->orderBy('full_name')->get();
         return view('tasks.create', compact('project', 'members'));
     }
 
@@ -60,7 +64,7 @@ class TaskController extends Controller
             'estimated_hours' => 'nullable|numeric|min:0.5|max:999',
             'assigned_to'     => [
                 'nullable', 'exists:users,id',
-                function ($attr, $value, $fail) use ($project) {
+                function ($_attr, $value, $fail) use ($project) {
                     if ($value && !$project->isDeveloper(User::find($value))) {
                         $fail('Người được giao phải là Developer của dự án.');
                     }
@@ -101,18 +105,26 @@ class TaskController extends Controller
             'histories.actor',
         ]);
 
-        $role        = $project->roleOf(Auth::user());
-        $members     = $project->developers()->orderBy('full_name')->get();
+        $role       = $project->roleOf(Auth::user());
+        $allMembers = $project->members()->orderBy('full_name')->get();
+        $members    = $allMembers->filter(fn($m) => in_array($m->pivot->role, ['pm', 'developer']));
+        $testers    = $allMembers->filter(fn($m) => $m->pivot->role === 'tester');
         $transitions = $task->nextTransitions(Auth::user());
 
-        return view('tasks.show', compact('project', 'task', 'role', 'members', 'transitions'));
+        return view('tasks.show', compact('project', 'task', 'role', 'members', 'testers', 'allMembers', 'transitions'));
     }
 
     // ── Cập nhật task chính ───────────────────────────────────────────────
     public function update(Request $request, Project $project, Task $task)
     {
-        $this->mustHaveRole($project, [Project::ROLE_PM]);
+        $this->mustBeMember($project);
         abort_if($task->project_id !== $project->id, 404);
+
+        $user = Auth::user();
+        $isCreator = $task->created_by === $user->id;
+        if (!$user->isAdmin() && !in_array($project->roleOf($user), [Project::ROLE_PM, Project::ROLE_DEVELOPER]) && !$isCreator) {
+            abort(403, 'Bạn không có quyền chỉnh sửa task này.');
+        }
 
         if ($task->status === Task::STATUS_DONE) {
             return back()->withErrors(['error' => 'Không thể chỉnh sửa Task đã Done.']);
@@ -128,9 +140,9 @@ class TaskController extends Controller
             'note'            => 'nullable|string|max:500',
             'assigned_to'     => [
                 'nullable', 'exists:users,id',
-                function ($attr, $value, $fail) use ($project) {
-                    if ($value && !$project->isDeveloper(User::find($value))) {
-                        $fail('Người được giao phải là Developer của dự án.');
+                function ($_attr, $value, $fail) use ($project) {
+                    if ($value && !$project->hasMember(User::find($value))) {
+                        $fail('Người được giao phải là thành viên của dự án.');
                     }
                 },
             ],
@@ -177,14 +189,46 @@ class TaskController extends Controller
         abort_if($task->project_id !== $project->id, 404);
 
         $request->validate([
-            'status' => 'required|string',
-            'note'   => 'nullable|string|max:500',
+            'status'      => 'required|string',
+            'note'        => 'nullable|string|max:500',
+            'assigned_to' => 'nullable|exists:users,id',
         ]);
 
-        $result = $task->transitionTo($request->status, Auth::user(), $request->note);
+        if ($request->filled('assigned_to')) {
+            $assignee  = User::find($request->assigned_to);
+            $actorRole = $project->roleOf(Auth::user());
+
+            if ($assignee && $project->hasMember($assignee)) {
+                $assigneeRole = $project->roleOf($assignee);
+
+                // Bất kỳ role nào cũng có thể giao cho Tester khi chuyển sang ready_to_test
+                if ($request->status === Task::STATUS_READY_TO_TEST
+                    && $assigneeRole === 'tester') {
+                    $task->update(['assigned_to' => $assignee->id]);
+                }
+                // Tester/PM giao lại cho PM hoặc Developer khi đang ở ready_to_test
+                elseif ($task->status === Task::STATUS_READY_TO_TEST
+                    && in_array($assigneeRole, ['pm', 'developer'])) {
+                    $task->update(['assigned_to' => $assignee->id]);
+                }
+            }
+        }
+
+        $oldStatus = $task->status;
+        $result    = $task->transitionTo($request->status, Auth::user(), $request->note);
 
         if (!$result['ok']) {
             return back()->withErrors(['transition' => $result['message']]);
+        }
+
+        // Notify testers when a bug moves to ready_to_test
+        if ($task->type === Task::TYPE_BUG && $request->status === Task::STATUS_READY_TO_TEST) {
+            $this->notifyTestersForBug($task, $project);
+        }
+
+        // Notify PMs when a story moves to review_approved
+        if ($task->isMainTask() && $request->status === Task::STATUS_REVIEW_APPROVED) {
+            $this->notifyPmsForReviewApproved($task, $project);
         }
 
         return back()->with('success', $result['message']);
@@ -212,7 +256,7 @@ class TaskController extends Controller
             'due_date'         => 'nullable|date|after_or_equal:start_date',
             'assigned_to'      => [
                 'nullable', 'exists:users,id',
-                function ($attr, $value, $fail) use ($project) {
+                function ($_attr, $value, $fail) use ($project) {
                     if ($value && !$project->hasMember(User::find($value))) {
                         $fail('Người được giao phải là thành viên của dự án.');
                     }
@@ -257,6 +301,53 @@ class TaskController extends Controller
         }
 
         return back()->with('success', $result['message']);
+    }
+
+    // ── Notification helpers ──────────────────────────────────────────────
+    private function notifyTestersForBug(Task $task, Project $project): void
+    {
+        $actor = Auth::user();
+
+        // Prefer assigned tester; fall back to all project testers
+        $assignee = $task->assignee;
+        if ($assignee && $project->roleOf($assignee) === 'tester') {
+            $recipients = [$assignee->id];
+        } else {
+            $recipients = $project->testers()->pluck('users.id')->toArray();
+        }
+
+        // Never notify yourself
+        $recipients = array_filter($recipients, fn($id) => $id !== $actor->id);
+
+        if (empty($recipients)) return;
+
+        $url = route('projects.tasks.show', [$project, $task]);
+        UserNotification::notifyUsers(array_values($recipients), [
+            'task_id' => $task->id,
+            'type'    => 'bug_ready_to_test',
+            'title'   => "Bug chờ kiểm tra: [{$task->code}]",
+            'body'    => "{$actor->full_name} đã chuyển bug \"{$task->title}\" sang Ready to Test.",
+            'url'     => $url,
+        ]);
+    }
+
+    private function notifyPmsForReviewApproved(Task $task, Project $project): void
+    {
+        $actor      = Auth::user();
+        $recipients = $project->pms()->pluck('users.id')
+            ->filter(fn($id) => $id !== $actor->id)
+            ->toArray();
+
+        if (empty($recipients)) return;
+
+        $url = route('projects.tasks.show', [$project, $task]);
+        UserNotification::notifyUsers(array_values($recipients), [
+            'task_id' => $task->id,
+            'type'    => 'review_approved',
+            'title'   => "Story đã được phê duyệt: [{$task->code}]",
+            'body'    => "{$actor->full_name} đã phê duyệt story \"{$task->title}\" — sẵn sàng nghiệm thu Done.",
+            'url'     => $url,
+        ]);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

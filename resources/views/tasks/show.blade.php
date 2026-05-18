@@ -15,7 +15,7 @@
 @endsection
 
 @section('topbar-actions')
-    @if ($role === 'pm' || Auth::user()->isAdmin())
+    @if ($role === 'pm' || $role === 'developer' || Auth::user()->isAdmin() || $task->created_by === Auth::id())
         <button class="btn btn-ghost" onclick="toggleEdit()">
             <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
                 <path d="M11.5 2.5 13 4l-8 8-2 .5.5-2 8-8zm1-1a1 1 0 0 1 .7.3l1 1a1 1 0 0 1 0 1.4l-9 9-3 .8.8-3 9-9A1 1 0 0 1 12.5 1.5z" />
@@ -92,20 +92,27 @@
         {{-- ── Status pipeline ──────────────────────────────────────────────── --}}
         <div class="pipeline">
             @php
-                $steps      = [
+                $steps = $task->isMainTask() ? [
                     ['key' => 'todo',            'label' => 'To Do'],
                     ['key' => 'in_progress',     'label' => 'In Progress'],
-                    ['key' => 'ready_to_test', 'label' => 'Ready to Test'],
+                    ['key' => 'ready_to_test',   'label' => 'Ready to Test'],
+                    ['key' => 'review_approved', 'label' => 'Approved'],
+                    ['key' => 'done',            'label' => 'Done'],
+                ] : [
+                    ['key' => 'todo',            'label' => 'To Do'],
+                    ['key' => 'in_progress',     'label' => 'In Progress'],
+                    ['key' => 'ready_to_test',   'label' => 'Ready to Test'],
                     ['key' => 'done',            'label' => 'Done'],
                 ];
                 $order      = array_column($steps, 'key');
                 $currentIdx = array_search($task->status, $order);
+                if ($currentIdx === false) $currentIdx = count($steps) - 1; // fallback
             @endphp
 
             @foreach ($steps as $i => $step)
                 <div class="pipeline-step {{ ($i < $currentIdx || ($i === $currentIdx && $task->status === 'done')) ? 'done' : ($i === $currentIdx ? 'active' : 'pending') }}">
                     <div class="pipeline-dot">
-                        @if ($i < $currentIdx)
+                        @if ($i < $currentIdx || ($i === $currentIdx && $task->status === 'done'))
                             <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
                                 <path d="M3.5 8.5 6 11l6.5-6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
                             </svg>
@@ -119,11 +126,11 @@
                     <div class="pipeline-label">{{ $step['label'] }}</div>
                     @if ($i === 0)
                         <div class="pipeline-time">{{ $task->created_at->format('d/m') }}</div>
-                    @elseif ($i === 1 && $task->started_at)
+                    @elseif ($step['key'] === 'in_progress' && $task->started_at)
                         <div class="pipeline-time">{{ $task->started_at->format('d/m') }}</div>
-                    @elseif ($i === 2 && $task->ready_at)
+                    @elseif ($step['key'] === 'ready_to_test' && $task->ready_at)
                         <div class="pipeline-time">{{ $task->ready_at->format('d/m') }}</div>
-                    @elseif ($i === 3 && $task->done_at)
+                    @elseif ($step['key'] === 'done' && $task->done_at)
                         <div class="pipeline-time">{{ $task->done_at->format('d/m') }}</div>
                     @endif
                 </div>
@@ -151,8 +158,21 @@
                         <path d="M3.5 8.5 6 11l6.5-6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
                     </svg>
                     Tất cả task con đã hoàn thành.
+                    @if ($role === 'tester' || Auth::user()->isAdmin())
+                        Tester có thể phê duyệt <strong>Review Approved</strong>.
+                    @elseif ($role === 'pm')
+                        Chờ Tester phê duyệt Review Approved trước khi nghiệm thu Done.
+                    @endif
+                </div>
+            @endif
+            @if ($task->isMainTask() && $task->status === 'review_approved')
+                <div class="auto-status-info" style="background:rgba(37,99,235,.07);border-color:rgba(37,99,235,.25);color:var(--blue);margin-bottom:10px">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM6.5 10.8 3.7 8l1-1 1.8 1.8 4-4 1 1-5 5z"/>
+                    </svg>
+                    Story đã được Tester phê duyệt.
                     @if ($role === 'pm' || Auth::user()->isAdmin())
-                        PM xác nhận để chuyển Done.
+                        PM có thể nghiệm thu <strong>Done</strong> nếu tất cả Bug đã đóng.
                     @endif
                 </div>
             @endif
@@ -161,11 +181,15 @@
                       style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;width:100%">
                     @csrf
                     <div style="flex-shrink:0">
-                        <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Chuyển sang</label>
-                        <select name="status" class="form-control" style="width:200px">
+                        <label class="tbar-label">Chuyển sang</label>
+                        <select name="status" id="statusSelect" class="form-control" style="width:190px"
+                                onchange="onStatusChange(this.value)">
                             @foreach (\App\Models\Task::STATUS_LABELS as $val => $label)
                                 @if ($val !== $task->status)
-                                    @if ($val === 'done' && $role !== 'pm' && !Auth::user()->isAdmin())
+                                    @if ($val === 'review_approved' && $role !== 'tester' && !Auth::user()->isAdmin())
+                                        @continue
+                                    @endif
+                                    @if ($val === 'done' && $role !== 'pm' && $role !== 'tester' && !Auth::user()->isAdmin())
                                         @continue
                                     @endif
                                     <option value="{{ $val }}">{{ $label }}</option>
@@ -173,8 +197,27 @@
                             @endforeach
                         </select>
                     </div>
-                    <div style="flex:1;min-width:180px">
-                        <label style="font-size:11px;color:var(--text-3);display:block;margin-bottom:4px">Ghi chú (tuỳ chọn)</label>
+
+                    {{-- Giao Tester (hiện khi chọn ready_to_test, mọi role đều thấy) --}}
+                    @if ($testers->isNotEmpty())
+                    <div id="testerField" style="display:none;flex-direction:column;flex-shrink:0">
+                        <label class="tbar-label">Giao Tester</label>
+                        <select name="assigned_to" id="testerSelect" disabled
+                                class="form-control" style="width:175px">
+                            <option value="">— Chưa giao —</option>
+                            @foreach ($testers as $t)
+                                <option value="{{ $t->id }}"
+                                    {{ $task->assigned_to == $t->id ? 'selected' : '' }}>
+                                    {{ $t->full_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+
+
+                    <div style="flex:1;min-width:160px">
+                        <label class="tbar-label">Ghi chú (tuỳ chọn)</label>
                         <input type="text" name="note" class="form-control" placeholder="Lý do, ghi chú...">
                     </div>
                     <button type="submit" class="btn btn-primary">Lưu</button>
@@ -213,13 +256,14 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Developer</label>
+                        <label class="form-label">Phân công</label>
                         <select name="assigned_to" class="form-control">
                             <option value="">— Chưa phân công —</option>
-                            @foreach ($members as $dev)
-                                <option value="{{ $dev->id }}"
-                                    {{ old('assigned_to', $task->assigned_to) == $dev->id ? 'selected' : '' }}>
-                                    {{ $dev->full_name }}
+                            @foreach ($allMembers as $m)
+                                <option value="{{ $m->id }}"
+                                    {{ old('assigned_to', $task->assigned_to) == $m->id ? 'selected' : '' }}>
+                                    {{ $m->full_name }}
+                                    ({{ \App\Models\Project::ROLE_LABELS[$m->pivot->role] ?? '' }})
                                 </option>
                             @endforeach
                         </select>
@@ -308,22 +352,26 @@
                     </div>
                     <div class="form-group" style="margin:0">
                         <label class="form-label">Loại</label>
-                        <select name="type" class="form-control">
+                        <select name="type" id="childType" class="form-control" onchange="onChildTypeChange(this.value)">
                             @foreach (\App\Models\Task::TYPE_LABELS as $val => $label)
                                 <option value="{{ $val }}"
                                     {{ $val === 'subtask' ? 'selected' : '' }}
                                     {{ $val === 'bug' && $task->status !== 'ready_to_test' ? 'disabled' : '' }}>
-                                    {{ $label }}{{ $val === 'bug' && $task->status !== 'ready_to_test' ? ' (chỉ tạo được khi Ready to Test)' : '' }}
+                                    {{ $label }}{{ $val === 'bug' && $task->status !== 'ready_to_test' ? ' (chỉ khi Ready to Test)' : '' }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
                     <div class="form-group" style="margin:0">
-                        <label class="form-label">Giao cho</label>
-                        <select name="assigned_to" class="form-control">
+                        <label class="form-label" id="childAssignLabel">Giao cho</label>
+                        <select name="assigned_to" id="childAssign" class="form-control">
                             <option value="">— Chưa giao —</option>
-                            @foreach ($members as $dev)
-                                <option value="{{ $dev->id }}">{{ $dev->full_name }}</option>
+                            @foreach ($allMembers as $m)
+                                <option value="{{ $m->id }}"
+                                    data-role="{{ $m->pivot->role }}">
+                                    {{ $m->full_name }}
+                                    ({{ \App\Models\Project::ROLE_LABELS[$m->pivot->role] ?? $m->pivot->role }})
+                                </option>
                             @endforeach
                         </select>
                     </div>
@@ -559,6 +607,7 @@
     .pipeline-time { font-size:10px; color:var(--text-3); }
 
     .transition-bar { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+    .tbar-label { font-size:11px; color:var(--text-3); display:block; margin-bottom:4px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.06em; }
 
     .auto-status-info {
         display:flex; align-items:center; gap:8px; padding:9px 14px;
@@ -627,6 +676,20 @@
 
 @push('scripts')
 <script>
+    function onStatusChange(val) {
+        const tf = document.getElementById('testerField');
+        const ts = document.getElementById('testerSelect');
+        if (tf && ts) {
+            const show = val === 'ready_to_test';
+            tf.style.display = show ? 'flex' : 'none';
+            ts.disabled = !show;
+        }
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        const sel = document.getElementById('statusSelect');
+        if (sel) onStatusChange(sel.value);
+    });
+
     function switchTab(name, btn) {
         document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -637,6 +700,31 @@
     function toggleEdit() {
         const f = document.getElementById('editForm');
         f.style.display = f.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function onChildTypeChange(type) {
+        const label  = document.getElementById('childAssignLabel');
+        const select = document.getElementById('childAssign');
+        if (!label || !select) return;
+
+        const opts = [...select.options];
+        const placeholder = opts.shift();
+        const devs    = opts.filter(o => o.dataset.role === 'developer');
+        const pms     = opts.filter(o => o.dataset.role === 'pm');
+        const testers = opts.filter(o => o.dataset.role === 'tester');
+
+        if (type === 'bug') {
+            // Bug phải giao cho Developer để fix
+            label.textContent = 'Giao cho Developer';
+            select.innerHTML = '';
+            [placeholder, ...devs, ...pms, ...testers].forEach(o => select.appendChild(o));
+            if (!select.value && devs.length) select.value = devs[0].value;
+        } else {
+            label.textContent = 'Giao cho';
+            select.innerHTML = '';
+            [placeholder, ...pms, ...devs, ...testers].forEach(o => select.appendChild(o));
+            select.value = '';
+        }
     }
 
     function toggleChildForm() {

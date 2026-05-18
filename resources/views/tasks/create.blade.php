@@ -53,12 +53,12 @@
         </div>
 
         <div class="form-group">
-            <label class="form-label" for="assigned_to">Phân công Developer</label>
+            <label class="form-label" for="assigned_to">Phân công</label>
             <select id="assigned_to" name="assigned_to" class="form-control">
                 <option value="">— Chưa phân công —</option>
-                @foreach($members as $dev)
-                <option value="{{ $dev->id }}" {{ old('assigned_to') == $dev->id ? 'selected' : '' }}>
-                    {{ $dev->full_name }}
+                @foreach($members as $m)
+                <option value="{{ $m->id }}" {{ old('assigned_to') == $m->id ? 'selected' : '' }}>
+                    {{ $m->full_name }} ({{ \App\Models\Project::ROLE_LABELS[$m->pivot->role] ?? $m->pivot->role }})
                 </option>
                 @endforeach
             </select>

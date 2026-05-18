@@ -28,35 +28,83 @@
 </div>
 
 {{-- ── Filters ──────────────────────────────────────────────────────────── --}}
-<form method="GET" action="{{ route('projects.tasks.index', $project) }}" class="filter-bar">
-    <input type="text" name="search" class="form-control" style="max-width:220px"
-        placeholder="Tìm code / tiêu đề..." value="{{ request('search') }}">
+@php $hasFilter = request()->hasAny(['search','status','priority','type','assigned_to','date_from','date_to']); @endphp
+<form method="GET" action="{{ route('projects.tasks.index', $project) }}" class="filter-strip filter-strip--standalone">
 
-    <select name="status" class="form-control" style="width:160px">
-        <option value="">Tất cả trạng thái</option>
-        @foreach (\App\Models\Task::STATUS_LABELS as $val => $label)
-            <option value="{{ $val }}" {{ request('status') === $val ? 'selected' : '' }}>{{ $label }}</option>
-        @endforeach
-    </select>
+    <svg class="filter-icon-svg" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M1 2h14l-5 6v5l-4-2V8L1 2z"/>
+    </svg>
 
-    <select name="priority" class="form-control" style="width:140px">
-        <option value="">Tất cả ưu tiên</option>
-        @foreach (\App\Models\Task::PRIORITY_LABELS as $val => $label)
-            <option value="{{ $val }}" {{ request('priority') === $val ? 'selected' : '' }}>{{ $label }}</option>
-        @endforeach
-    </select>
+    <div class="filter-group">
+        <label class="filter-label">Tìm kiếm</label>
+        <input type="text" name="search" class="filter-control filter-control--search {{ request('search') ? 'filter-active' : '' }}"
+               placeholder="Code / tiêu đề..." value="{{ request('search') }}">
+    </div>
 
-    <select name="type" class="form-control" style="width:130px">
-        <option value="">Tất cả loại</option>
-        @foreach (\App\Models\Task::TYPE_LABELS as $val => $label)
-            <option value="{{ $val }}" {{ request('type') === $val ? 'selected' : '' }}>{{ $label }}</option>
-        @endforeach
-    </select>
+    <div class="filter-group">
+        <label class="filter-label">Trạng thái</label>
+        <select name="status" class="filter-control {{ request('status') ? 'filter-active' : '' }}">
+            <option value="">Tất cả</option>
+            @foreach (\App\Models\Task::STATUS_LABELS as $val => $label)
+                <option value="{{ $val }}" {{ request('status') === $val ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+        </select>
+    </div>
 
-    <button type="submit" class="btn btn-ghost btn-sm">Lọc</button>
-    @if (request()->hasAny(['search', 'status', 'priority', 'type']))
-        <a href="{{ route('projects.tasks.index', $project) }}" class="btn btn-ghost btn-sm">Xoá lọc</a>
+    <div class="filter-group">
+        <label class="filter-label">Ưu tiên</label>
+        <select name="priority" class="filter-control {{ request('priority') ? 'filter-active' : '' }}">
+            <option value="">Tất cả</option>
+            @foreach (\App\Models\Task::PRIORITY_LABELS as $val => $label)
+                <option value="{{ $val }}" {{ request('priority') === $val ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+        </select>
+    </div>
+
+    <div class="filter-group">
+        <label class="filter-label">Loại</label>
+        <select name="type" class="filter-control {{ request('type') ? 'filter-active' : '' }}">
+            <option value="">Tất cả</option>
+            @foreach (\App\Models\Task::TYPE_LABELS as $val => $label)
+                <option value="{{ $val }}" {{ request('type') === $val ? 'selected' : '' }}>{{ $label }}</option>
+            @endforeach
+        </select>
+    </div>
+
+    @if ($role === 'pm' || Auth::user()->isAdmin())
+    <div class="filter-group">
+        <label class="filter-label">Người nhận</label>
+        <select name="assigned_to" class="filter-control {{ request('assigned_to') ? 'filter-active' : '' }}">
+            <option value="">Tất cả</option>
+            @foreach ($members as $m)
+                <option value="{{ $m->id }}" {{ request('assigned_to') == $m->id ? 'selected' : '' }}>{{ $m->full_name }}</option>
+            @endforeach
+        </select>
+    </div>
     @endif
+
+    <div class="filter-group">
+        <label class="filter-label">Từ ngày</label>
+        <input type="date" name="date_from" class="filter-control {{ request('date_from') ? 'filter-active' : '' }}" value="{{ request('date_from') }}">
+    </div>
+
+    <div class="filter-group">
+        <label class="filter-label">Đến ngày</label>
+        <input type="date" name="date_to" class="filter-control {{ request('date_to') ? 'filter-active' : '' }}" value="{{ request('date_to') }}">
+    </div>
+
+    <div class="filter-actions">
+        <button type="submit" class="filter-btn-apply">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M6.5 1a5.5 5.5 0 1 0 3.89 9.397l3.357 3.356.707-.707-3.356-3.357A5.5 5.5 0 0 0 6.5 1zM2 6.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z"/></svg>
+            Lọc
+        </button>
+        @if ($hasFilter)
+            <a href="{{ route('projects.tasks.index', $project) }}" class="filter-btn-clear">
+                <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.293 4.293a1 1 0 0 1 1.414 0L8 6.586l2.293-2.293a1 1 0 1 1 1.414 1.414L9.414 8l2.293 2.293a1 1 0 0 1-1.414 1.414L8 9.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L6.586 8 4.293 5.707a1 1 0 0 1 0-1.414z"/></svg>
+                Xoá lọc
+            </a>
+        @endif
+    </div>
 </form>
 
 {{-- ── Flash ────────────────────────────────────────────────────────────── --}}
@@ -68,7 +116,7 @@
 <div class="card" style="padding:0">
     @if ($tasks->isEmpty())
         <div style="padding:48px;text-align:center;color:var(--text-3)">
-            @if (request()->hasAny(['search', 'status', 'priority', 'type']))
+            @if (request()->hasAny(['search', 'status', 'priority', 'type', 'assigned_to', 'date_from', 'date_to']))
                 Không tìm thấy task nào khớp bộ lọc.
             @elseif ($role === 'pm' || Auth::user()->isAdmin())
                 Chưa có Task nào. <a href="{{ route('projects.tasks.create', $project) }}" style="color:var(--accent)">Tạo Task đầu tiên</a>
@@ -158,10 +206,57 @@
 
 @push('styles')
 <style>
-    .filter-bar {
-        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    /* ── Filter strip (shared) ────────────────────────────────────────── */
+    .filter-strip {
+        display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+        padding: 14px 16px;
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--border);
+    }
+    .filter-strip--standalone {
+        border: 1px solid var(--border);
+        border-radius: 8px;
         margin-bottom: 16px;
     }
+    .filter-icon-svg { width:14px;height:14px;color:var(--text-3);flex-shrink:0;margin-bottom:7px; }
+    .filter-group { display:flex;flex-direction:column;gap:4px; }
+    .filter-label {
+        font-family: var(--font-mono); font-size: 10px;
+        text-transform: uppercase; letter-spacing: .06em;
+        color: var(--text-3); white-space: nowrap;
+    }
+    .filter-control {
+        height: 32px; padding: 0 10px; font-size: 12.5px;
+        font-family: var(--font-body); color: var(--text-1);
+        background: var(--bg-1); border: 1px solid var(--border);
+        border-radius: 5px; cursor: pointer;
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .filter-control--search { width: 190px; cursor: text; }
+    .filter-control:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-glow); }
+    .filter-control.filter-active {
+        border-color: var(--accent);
+        background: rgba(249,115,22,.06);
+        color: var(--accent); font-weight: 500;
+    }
+    .filter-actions { display:flex;align-items:center;gap:6px;margin-left:4px; }
+    .filter-btn-apply {
+        display:inline-flex;align-items:center;gap:5px;
+        height:32px;padding:0 14px;
+        background:var(--accent);color:#fff;border:none;border-radius:5px;
+        font-size:12.5px;font-weight:600;cursor:pointer;transition:opacity .15s;white-space:nowrap;
+    }
+    .filter-btn-apply svg { width:13px;height:13px; }
+    .filter-btn-apply:hover { opacity:.88; }
+    .filter-btn-clear {
+        display:inline-flex;align-items:center;gap:4px;
+        height:32px;padding:0 10px;font-size:12px;
+        color:var(--text-3);border:1px solid var(--border);border-radius:5px;
+        text-decoration:none;background:var(--bg-1);
+        transition:color .15s,border-color .15s;white-space:nowrap;
+    }
+    .filter-btn-clear svg { width:12px;height:12px; }
+    .filter-btn-clear:hover { color:var(--red);border-color:rgba(220,38,38,.3); }
 
     .task-table {
         width: 100%; border-collapse: collapse; font-size: 13.5px;

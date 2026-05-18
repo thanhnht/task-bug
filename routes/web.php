@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Admin\AdminUserController;
-use App\Http\Controllers\{ProjectController, TaskController, DashboardController};
+use App\Http\Controllers\{ProjectController, TaskController, DashboardController, QualityController, NotificationController};
 
 // ─── Public routes (chưa đăng nhập) ─────────────────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -25,6 +25,19 @@ Route::middleware(['auth', 'account.active'])->group(function () {
 
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('employee.dashboard');
+
+        // Báo cáo & Đánh giá chất lượng
+        Route::prefix('quality')->name('quality.')->group(function () {
+            Route::get('/',            [QualityController::class, 'index'])->name('index');
+            Route::get('/{project}',   [QualityController::class, 'show'])->name('show');
+        });
+
+        // Thông báo
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::get('/',                          [NotificationController::class, 'index'])->name('index');
+            Route::post('/read-all',                 [NotificationController::class, 'markAllRead'])->name('read-all');
+            Route::post('/{notification}/read',      [NotificationController::class, 'markRead'])->name('read');
+        });
 
         // ─── Admin only ───────────────────────────────────────────────────────
         Route::middleware('admin.only')->prefix('admin')->name('admin.')->group(function () {

@@ -74,38 +74,37 @@ class ProjectController extends Controller
     {
         $this->mustBeMember($project);
 
-        $statusFilter = request('status');
-        $typeFilter   = request('type');
-
         $project->load(['creator', 'members']);
-
-        $rootTasks = $project->tasks()
-            ->when($statusFilter, fn($q) => $q->where('status', $statusFilter))
-            ->when($typeFilter,   fn($q) => $q->where('type', $typeFilter))
-            ->withCount([
-                'children as children_count'         => fn($q) => $q->where('type', '!=', 'bug'),
-                'children as pending_children_count' => fn($q) => $q->where('type', '!=', 'bug')->whereNotIn('status', ['done']),
-            ])
-            ->with('assignee')
-            ->orderByDesc('created_at')
-            ->get();
 
         $user = Auth::user();
         $role = $project->roleOf($user);
 
-        // Stats luôn tính trên toàn bộ root tasks (không phụ thuộc filter)
-        $allRootStatuses = $project->tasks()->whereNull('parent_id')->selectRaw('status, count(*) as cnt')->groupBy('status')->pluck('cnt', 'status');
-        $stats = [
-            'total'    => $allRootStatuses->sum(),
-            'todo'     => $allRootStatuses->get('todo', 0),
-            'progress' => $allRootStatuses->get('in_progress', 0),
-            'review'   => $allRootStatuses->get('ready_to_test', 0),
-            'done'     => $allRootStatuses->get('done', 0),
-        ];
+        // Mặc định chọn 'task' khi vào lần đầu; 'Tất cả' = type='' trong URL
+        $typeFilter = request()->has('type') ? request('type') : 'task';
 
+        $query = $project->tasks()
+            ->with('assignee')
+            ->withCount([
+                'children as children_count'         => fn($q) => $q->where('type', '!=', 'bug'),
+                'children as pending_children_count' => fn($q) => $q->where('type', '!=', 'bug')->whereNotIn('status', ['done']),
+            ]);
+
+        // Tất cả / Task → chỉ hiện root; loại khác (bug, subtask…) → hiện cả task con
+        if (!$typeFilter || $typeFilter === 'task') {
+            $query->whereNull('parent_id');
+        }
+
+        if (request()->filled('status'))      $query->where('status', request('status'));
+        if ($typeFilter)                      $query->where('type', $typeFilter);
+        if (request()->filled('assigned_to')) $query->where('assigned_to', request('assigned_to'));
+        if (request()->filled('date_from'))   $query->whereDate('created_at', '>=', request('date_from'));
+        if (request()->filled('date_to'))     $query->whereDate('created_at', '<=', request('date_to'));
+
+        $rootTasks = $query->orderByDesc('created_at')->get();
+        $members   = $project->members()->orderBy('full_name')->get();
         $employees = User::where('is_active', true)->where('role', 'employee')->orderBy('full_name')->get();
 
-        return view('projects.show', compact('project', 'role', 'stats', 'employees', 'rootTasks'));
+        return view('projects.show', compact('project', 'role', 'employees', 'rootTasks', 'members', 'typeFilter'));
     }
 
     // ── Cập nhật project ─────────────────────────────────────────────────
