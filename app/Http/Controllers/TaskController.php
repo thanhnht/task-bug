@@ -88,6 +88,10 @@ class TaskController extends Controller
             'changed_by'  => Auth::id(),
         ]);
 
+        if ($task->assigned_to) {
+            $this->notifyAssigned($task, $project, $task->assigned_to);
+        }
+
         return redirect()->route('projects.tasks.show', [$project, $task])
                          ->with('success', "Task <strong>{$task->code}</strong> đã được tạo.");
     }
@@ -126,10 +130,6 @@ class TaskController extends Controller
             abort(403, 'Bạn không có quyền chỉnh sửa task này.');
         }
 
-        if ($task->status === Task::STATUS_DONE) {
-            return back()->withErrors(['error' => 'Không thể chỉnh sửa Task đã Done.']);
-        }
-
         $data = $request->validate([
             'title'           => 'required|string|max:200',
             'description'     => 'nullable|string',
@@ -154,7 +154,10 @@ class TaskController extends Controller
         // Ghi lại các thay đổi quan trọng
         $changes = [];
 
-        if (array_key_exists('assigned_to', $data) && $data['assigned_to'] != $task->assigned_to) {
+        $assigneeChanged = array_key_exists('assigned_to', $data) && $data['assigned_to'] != $task->assigned_to;
+        $newAssigneeId   = $assigneeChanged ? ($data['assigned_to'] ?? null) : null;
+
+        if ($assigneeChanged) {
             $oldName = $task->assignee?->full_name ?? 'Chưa giao';
             $newName = $data['assigned_to'] ? User::find($data['assigned_to'])?->full_name : 'Chưa giao';
             $changes[] = "Assign: {$oldName} → {$newName}";
@@ -171,6 +174,10 @@ class TaskController extends Controller
         $historyNote = collect([$note, implode('; ', $changes)])->filter()->implode(' — ');
 
         $task->update($data);
+
+        if ($newAssigneeId) {
+            $this->notifyAssigned($task, $project, $newAssigneeId);
+        }
 
         $task->histories()->create([
             'from_status' => $task->status,
@@ -193,6 +200,8 @@ class TaskController extends Controller
             'note'        => 'nullable|string|max:500',
             'assigned_to' => 'nullable|exists:users,id',
         ]);
+
+        $oldAssigneeId = $task->assigned_to;
 
         if ($request->filled('assigned_to')) {
             $assignee  = User::find($request->assigned_to);
@@ -221,9 +230,17 @@ class TaskController extends Controller
             return back()->withErrors(['transition' => $result['message']]);
         }
 
-        // Notify testers when a bug moves to ready_to_test
+        // Notify testers when a bug moves to ready_to_test (handles assignee notification too)
         if ($task->type === Task::TYPE_BUG && $request->status === Task::STATUS_READY_TO_TEST) {
             $this->notifyTestersForBug($task, $project);
+        }
+
+        // Notify new assignee if assignment changed (skip bug→RTT: already handled above)
+        $task->refresh();
+        $newAssigneeId = $task->assigned_to;
+        $isBugToRTT = $task->type === Task::TYPE_BUG && $request->status === Task::STATUS_READY_TO_TEST;
+        if (!$isBugToRTT && $newAssigneeId && $newAssigneeId !== $oldAssigneeId) {
+            $this->notifyAssigned($task, $project, $newAssigneeId);
         }
 
         // Notify PMs when a story moves to review_approved
@@ -264,7 +281,7 @@ class TaskController extends Controller
             ],
         ]);
 
-        $project->tasks()->create([
+        $child = $project->tasks()->create([
             'code'            => Task::nextCode(),
             'parent_id'       => $task->id,
             'type'            => $data['type'],
@@ -278,6 +295,10 @@ class TaskController extends Controller
             'status'          => Task::STATUS_TODO,
             'created_by'      => Auth::id(),
         ]);
+
+        if ($child->assigned_to) {
+            $this->notifyAssigned($child, $project, $child->assigned_to);
+        }
 
         return back()->with('success', 'Task con đã được thêm.');
     }
@@ -304,6 +325,21 @@ class TaskController extends Controller
     }
 
     // ── Notification helpers ──────────────────────────────────────────────
+    private function notifyAssigned(Task $task, Project $project, int $assigneeId): void
+    {
+        if ($assigneeId === Auth::id()) return;
+
+        $actor = Auth::user();
+        $url   = route('projects.tasks.show', [$project, $task]);
+        UserNotification::notifyUsers([$assigneeId], [
+            'task_id' => $task->id,
+            'type'    => 'assigned',
+            'title'   => "Bạn được giao: [{$task->code}]",
+            'body'    => "{$actor->full_name} đã giao {$task->typeLabel()} \"{$task->title}\" cho bạn.",
+            'url'     => $url,
+        ]);
+    }
+
     private function notifyTestersForBug(Task $task, Project $project): void
     {
         $actor = Auth::user();

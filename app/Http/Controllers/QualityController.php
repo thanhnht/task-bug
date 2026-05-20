@@ -157,7 +157,10 @@ class QualityController extends Controller
 
             $allTaskIds = $completedTaskIds->merge($openTaskIds)->unique();
             $tasksTotal = $allTaskIds->count();
-            $tasksDone  = Task::whereIn('id', $completedTaskIds)->where('status', Task::STATUS_DONE)->count();
+            // Dev's job is done when task reaches RTT or beyond (tester/PM handles the rest)
+            $tasksDone  = Task::whereIn('id', $completedTaskIds)
+                ->whereIn('status', [Task::STATUS_READY_TO_TEST, Task::STATUS_REVIEW_APPROVED, Task::STATUS_DONE])
+                ->count();
 
             // ── Bug: dev fix xong = chuyển sang ready_to_test (dev không được mark done trực tiếp)
             $bugHistQ = $makeHist()
@@ -176,7 +179,10 @@ class QualityController extends Controller
 
             $allBugIds    = $fixedBugIds->merge($openBugIds)->unique();
             $bugsTotal    = $allBugIds->count();
-            $bugsResolved = Task::whereIn('id', $fixedBugIds)->where('status', Task::STATUS_DONE)->count();
+            // Bug "resolved" by dev = moved to RTT (tester verifies and closes)
+            $bugsResolved = Task::whereIn('id', $fixedBugIds)
+                ->whereIn('status', [Task::STATUS_READY_TO_TEST, Task::STATUS_DONE])
+                ->count();
 
             // ── Retest: task/bug dev đã làm mà bị trả lại in_progress
             $allDevTaskIds = $allTaskIds->merge($allBugIds)->unique()->values();
@@ -192,14 +198,14 @@ class QualityController extends Controller
                 $retestCount = $retestQ->count();
             }
 
-            // ── Avg fix time (main tasks dev hoàn thành)
-            $avgFixHours = $completedTaskIds->isEmpty() ? null :
-                Task::whereIn('id', $completedTaskIds)
-                    ->whereNull('parent_id')
-                    ->whereNotNull('started_at')
-                    ->whereNotNull('ready_at')
-                    ->selectRaw('AVG(TIMESTAMPDIFF(HOUR, started_at, ready_at)) as avg_hours')
-                    ->value('avg_hours');
+            // ── Avg estimated hours: trung bình estimated_hours của task dev đã hoàn thành
+            $allCompletedIds = $completedTaskIds->merge($fixedBugIds)->unique()->values();
+            $avgFixHours = $allCompletedIds->isEmpty() ? null :
+                Task::whereIn('id', $allCompletedIds)
+                    ->whereNotNull('estimated_hours')
+                    ->where('estimated_hours', '>', 0)
+                    ->avg('estimated_hours');
+            $avgFixHours = $avgFixHours !== null ? round((float) $avgFixHours, 1) : null;
 
             $totalWork = $tasksTotal + $bugsTotal;
             $totalDone = $tasksDone  + $bugsResolved;
@@ -234,12 +240,23 @@ class QualityController extends Controller
             $bugsFound  = (clone $foundQ)->count();
             $bugsClosed = (clone $foundQ)->where('status', Task::STATUS_DONE)->count();
 
+            // Tasks/bugs the tester verified (moved to done or review_approved for root tasks)
+            $verifiedQ = TaskHistory::join('tasks', 'task_histories.task_id', '=', 'tasks.id')
+                ->where('tasks.project_id', $project->id)
+                ->where('task_histories.changed_by', $tester->id)
+                ->whereIn('task_histories.to_status', [Task::STATUS_REVIEW_APPROVED, Task::STATUS_DONE])
+                ->select('tasks.id');
+            if ($dateFrom) $verifiedQ->whereDate('task_histories.created_at', '>=', $dateFrom);
+            if ($dateTo)   $verifiedQ->whereDate('task_histories.created_at', '<=', $dateTo);
+            $tasksVerified = $verifiedQ->distinct()->pluck('tasks.id')->count();
+
             return (object)[
-                'user'        => $tester,
-                'bugs_found'  => $bugsFound,
-                'bugs_closed' => $bugsClosed,
-                'close_rate'  => $bugsFound > 0 ? round($bugsClosed / $bugsFound * 100) : null,
-                'dre'         => $bugTotal > 0 ? round($bugsFound / $bugTotal * 100, 1) : null,
+                'user'           => $tester,
+                'bugs_found'     => $bugsFound,
+                'bugs_closed'    => $bugsClosed,
+                'tasks_verified' => $tasksVerified,
+                'close_rate'     => $bugsFound > 0 ? round($bugsClosed / $bugsFound * 100) : null,
+                'dre'            => $bugTotal > 0 ? round($bugsFound / $bugTotal * 100, 1) : null,
             ];
         });
 

@@ -204,8 +204,9 @@
             <thead>
                 <tr>
                     <th>Tester</th>
-                    <th style="text-align:center">Bug Tìm Được</th>
-                    <th style="text-align:center">Đã Đóng</th>
+                    <th style="text-align:center" title="Số bug tester tìm và log lên">Bug Tìm Được</th>
+                    <th style="text-align:center" title="Số bug đã được đóng (done)">Đã Đóng</th>
+                    <th style="text-align:center" title="Số task/bug tester xác nhận xong (chuyển Review Approved hoặc Done)">Task Xác nhận</th>
                     <th style="text-align:center" title="Tỷ lệ bug đã đóng / tổng bug tìm được">Tỷ lệ đóng</th>
                     <th style="text-align:center" title="Bug tìm được / tổng bug toàn dự án × 100">DRE đóng góp</th>
                 </tr>
@@ -222,6 +223,9 @@
                         </td>
                         <td style="text-align:center;font-family:var(--font-mono);font-weight:700;color:var(--green)">
                             {{ $row->bugs_found > 0 ? $row->bugs_closed : '—' }}
+                        </td>
+                        <td style="text-align:center;font-family:var(--font-mono);font-weight:700;color:var(--blue)">
+                            {{ $row->tasks_verified ?: '—' }}
                         </td>
                         <td style="text-align:center;min-width:120px">
                             @if ($row->close_rate !== null)
@@ -266,11 +270,11 @@
             <thead>
                 <tr>
                     <th>Developer</th>
-                    <th style="text-align:center" title="Task (không phải bug) được giao">Task</th>
-                    <th style="text-align:center" title="Bug được giao để fix">Bug Fix</th>
-                    <th style="text-align:center" title="Tổng công việc hoàn thành / tổng được giao">Hoàn thành</th>
+                    <th style="text-align:center" title="Task (không phải bug): số đã giao lên RTT / tổng">Task</th>
+                    <th style="text-align:center" title="Bug đã fix lên RTT / tổng được giao">Bug Fix</th>
+                    <th style="text-align:center" title="Tổng đã giao lên RTT hoặc Done / tổng được giao">Hoàn thành</th>
                     <th style="text-align:center" title="Số lần task trả về từ Ready to Test">Retest</th>
-                    <th style="text-align:center" title="Thời gian trung bình từ In Progress đến Ready to Test">Avg Time</th>
+                    <th style="text-align:center" title="Trung bình estimated_hours của các task/bug dev đã hoàn thành">Avg Est.</th>
                 </tr>
             </thead>
             <tbody>
@@ -334,11 +338,20 @@
                         <td style="text-align:center">
                             @if ($row->avg_fix_hours !== null)
                                 @php
-                                    $h = floor($row->avg_fix_hours);
-                                    $m = round(($row->avg_fix_hours - $h) * 60);
+                                    $h = (int) floor($row->avg_fix_hours);
+                                    $m = (int) round(($row->avg_fix_hours - $h) * 60);
+                                    if ($m === 60) { $h++; $m = 0; }
                                 @endphp
                                 <span style="font-family:var(--font-mono);font-size:13px;color:var(--text-2)">
-                                    {{ $h > 0 ? "{$h}h " : '' }}{{ $m > 0 ? "{$m}m" : ($h === 0 ? '< 1h' : '') }}
+                                    @if ($h > 0 && $m > 0)
+                                        {{ $h }}h {{ $m }}m
+                                    @elseif ($h > 0)
+                                        {{ $h }}h
+                                    @elseif ($m > 0)
+                                        {{ $m }}m
+                                    @else
+                                        &lt; 1m
+                                    @endif
                                 </span>
                             @else
                                 <span style="color:var(--text-3)">—</span>
@@ -365,6 +378,9 @@
 <div style="margin-top:16px;font-size:12px;color:var(--text-3);display:flex;gap:20px;flex-wrap:wrap;">
     <span><strong style="color:var(--text-2)">DRE</strong> = Bugs đóng / Tổng bugs × 100</span>
     <span><strong style="color:var(--text-2)">Retest</strong> = Số lần task từ Ready to Test → In Progress</span>
+    <span><strong style="color:var(--text-2)">Hoàn thành (Dev)</strong> = Task/Bug đã giao lên RTT hoặc Done</span>
+    <span><strong style="color:var(--text-2)">Task Xác nhận (Tester)</strong> = Task tester chuyển sang Review Approved / Done</span>
+    <span><strong style="color:var(--text-2)">Avg Est.</strong> = Trung bình giờ ước tính của các task dev đã hoàn thành</span>
     <span style="color:var(--green)">● ≥ 80% tốt</span>
     <span style="color:var(--yellow)">● 50–79% trung bình</span>
     <span style="color:var(--red)">● &lt; 50% cần cải thiện</span>

@@ -32,11 +32,13 @@
             $iconColor = match($notif->type) {
                 'bug_ready_to_test' => 'var(--yellow)',
                 'review_approved'   => 'var(--blue)',
+                'assigned'          => 'var(--green)',
                 default             => 'var(--text-3)',
             };
             $iconPath = match($notif->type) {
                 'bug_ready_to_test' => 'M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 2a5 5 0 1 1 0 10A5 5 0 0 1 8 3zm-1 4h2v4H7V7zm0 5h2v2H7v-2z',
                 'review_approved'   => 'M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM6.5 10.8 3.7 8l1-1 1.8 1.8 4-4 1 1-5 5z',
+                'assigned'          => 'M8 1a3 3 0 1 1 0 6A3 3 0 0 1 8 1zm0 8c3.3 0 6 1.3 6 3v1H2v-1c0-1.7 2.7-3 6-3z',
                 default             => 'M8 1a5 5 0 0 0-5 5v2.5l-1 1.5v1h12v-1l-1-1.5V6a5 5 0 0 0-5-5zm-1.5 11a1.5 1.5 0 0 0 3 0h-3z',
             };
         @endphp

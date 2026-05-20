@@ -136,6 +136,10 @@ class Task extends Model
         }
 
         if ($newStatus === self::STATUS_REVIEW_APPROVED) {
+            // Only root tasks go through review_approved before PM marks done
+            if ($this->isChildTask()) {
+                return ['ok' => false, 'message' => 'Task con không cần bước Review Approved — Tester chuyển thẳng sang Done.'];
+            }
             $role = $this->project->roleOf($actor);
             if (!$actor->isAdmin() && $role !== 'tester') {
                 return ['ok' => false, 'message' => 'Chỉ Tester mới có thể phê duyệt Review Approved.'];
@@ -143,17 +147,25 @@ class Task extends Model
         }
 
         if ($newStatus === self::STATUS_DONE) {
-            // Story (root task) must pass through review_approved first
+            // Root task: must pass through review_approved first (PM approves)
             if ($this->isMainTask() && $this->status !== self::STATUS_REVIEW_APPROVED) {
-                return ['ok' => false, 'message' => 'Story phải được Tester phê duyệt (Review Approved) trước khi nghiệm thu Done.'];
+                return ['ok' => false, 'message' => 'Task chính phải được Tester phê duyệt (Review Approved) trước khi PM nghiệm thu Done.'];
             }
 
             $check = $this->canBeDone();
             if (!$check['ok']) return $check;
 
             $role = $this->project->roleOf($actor);
-            if (!$actor->isAdmin() && $role !== 'pm' && $role !== 'tester') {
-                return ['ok' => false, 'message' => 'Chỉ PM hoặc Tester mới có thể xác nhận hoàn thành (Done).'];
+            if ($this->isMainTask()) {
+                // Root task done: only PM (or admin)
+                if (!$actor->isAdmin() && $role !== 'pm') {
+                    return ['ok' => false, 'message' => 'Chỉ PM mới có thể nghiệm thu Done cho Task chính.'];
+                }
+            } else {
+                // Child task done: PM or Tester
+                if (!$actor->isAdmin() && $role !== 'pm' && $role !== 'tester') {
+                    return ['ok' => false, 'message' => 'Chỉ PM hoặc Tester mới có thể xác nhận hoàn thành (Done).'];
+                }
             }
         }
 
@@ -333,9 +345,10 @@ class Task extends Model
     {
         $result = [];
         foreach (self::STATUS_LABELS as $status => $label) {
-            if ($status !== $this->status) {
-                $result[] = ['status' => $status, 'label' => $label];
-            }
+            if ($status === $this->status) continue;
+            // Child tasks skip review_approved — they go directly to done
+            if ($status === self::STATUS_REVIEW_APPROVED && $this->isChildTask()) continue;
+            $result[] = ['status' => $status, 'label' => $label];
         }
         return $result;
     }
