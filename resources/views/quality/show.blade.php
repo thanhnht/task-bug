@@ -56,9 +56,7 @@
     @media (max-width: 768px) {
         .charts-row { grid-template-columns: 1fr; }
     }
-    @media print {
-        .btn, form, .topbar-actions { display: none !important; }
-    }
+
 </style>
 @endpush
 
@@ -96,10 +94,6 @@
     @if ($dateFrom || $dateTo)
         <a href="{{ route('quality.show', $project) }}" class="btn btn-ghost">Xoá lọc</a>
     @endif
-    <button type="button" onclick="window.print()" class="btn btn-ghost" style="margin-left:auto">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h8v3H4V1zM1 5h14v7h-3v3H4v-3H1V5zm3 7v2h8v-2H4zm-1-5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>
-        In / PDF
-    </button>
 </form>
 
 {{-- Summary cards --}}
