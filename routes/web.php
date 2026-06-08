@@ -54,40 +54,41 @@ Route::middleware(['auth', 'account.active'])->group(function () {
                 Route::post('/{user}/unlock',         [AdminUserController::class, 'unlock'])->name('unlock');
             });
         });
-    });
 
-    Route::prefix('projects')->name('projects.')->group(function () {
+        // ─── Projects & Tasks ─────────────────────────────────────────────────
+        Route::prefix('projects')->name('projects.')->group(function () {
 
-        Route::get('/',       [ProjectController::class, 'index'])->name('index');
-        Route::get('/create', [ProjectController::class, 'create'])->name('create');
-        Route::post('/',      [ProjectController::class, 'store'])->name('store');
+            Route::get('/',       [ProjectController::class, 'index'])->name('index');
+            Route::get('/create', [ProjectController::class, 'create'])->name('create');
+            Route::post('/',      [ProjectController::class, 'store'])->name('store');
 
-        Route::prefix('{project}')->group(function () {
-            Route::get('/',     [ProjectController::class, 'show'])->name('show');
-            Route::get('/edit', [ProjectController::class, 'edit'])->name('edit');
-            Route::put('/',     [ProjectController::class, 'update'])->name('update');
+            Route::prefix('{project}')->group(function () {
+                Route::get('/',     [ProjectController::class, 'show'])->name('show');
+                Route::get('/edit', [ProjectController::class, 'edit'])->name('edit');
+                Route::put('/',     [ProjectController::class, 'update'])->name('update');
 
-            // Member management (Admin + PM)
-            Route::post('/members',             [ProjectController::class, 'addMember'])->name('members.add');
-            Route::delete('/members',           [ProjectController::class, 'removeMember'])->name('members.remove');
-            Route::patch('/members/role',       [ProjectController::class, 'updateMemberRole'])->name('members.update-role');
+                // Member management (Admin + PM)
+                Route::post('/members',             [ProjectController::class, 'addMember'])->name('members.add');
+                Route::delete('/members',           [ProjectController::class, 'removeMember'])->name('members.remove');
+                Route::patch('/members/role',       [ProjectController::class, 'updateMemberRole'])->name('members.update-role');
 
-            // ══════════════════════════════════════════════════════════════
-            // TASKS (nested under project)
-            // ══════════════════════════════════════════════════════════════
-            Route::prefix('tasks')->name('tasks.')->group(function () {
+                // ══════════════════════════════════════════════════════════════
+                // TASKS (nested under project)
+                // ══════════════════════════════════════════════════════════════
+                Route::prefix('tasks')->name('tasks.')->group(function () {
 
-                Route::get('/',       [TaskController::class, 'index'])->name('index');
-                Route::get('/create', [TaskController::class, 'create'])->name('create');
-                Route::post('/',      [TaskController::class, 'store'])->name('store');
+                    Route::get('/',       [TaskController::class, 'index'])->name('index');
+                    Route::get('/create', [TaskController::class, 'create'])->name('create');
+                    Route::post('/',      [TaskController::class, 'store'])->name('store');
 
-                Route::prefix('{task}')->group(function () {
-                    Route::get('/',            [TaskController::class, 'show'])->name('show');
-                    Route::patch('/',          [TaskController::class, 'update'])->name('update');
-                    Route::post('/transition', [TaskController::class, 'transition'])->name('transition');
-                    // Task con (bất kỳ thành viên tạo)
-                    Route::post('/children',                         [TaskController::class, 'storeChild'])->name('children.store');
-                    Route::post('/children/{child}/transition',      [TaskController::class, 'transitionChild'])->name('children.transition');
+                    Route::prefix('{task}')->group(function () {
+                        Route::get('/',            [TaskController::class, 'show'])->name('show');
+                        Route::patch('/',          [TaskController::class, 'update'])->name('update');
+                        Route::post('/transition', [TaskController::class, 'transition'])->name('transition');
+                        // Task con (bất kỳ thành viên tạo)
+                        Route::post('/children',                         [TaskController::class, 'storeChild'])->name('children.store');
+                        Route::post('/children/{child}/transition',      [TaskController::class, 'transitionChild'])->name('children.transition');
+                    });
                 });
             });
         });
