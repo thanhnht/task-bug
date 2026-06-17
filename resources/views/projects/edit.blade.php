@@ -155,7 +155,7 @@
         }
 
         .member-role.pm {
-            background: rgba(249, 115, 22, .15);
+            background: rgba(37, 99, 235, .15);
             color: var(--accent);
         }
 

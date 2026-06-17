@@ -43,10 +43,10 @@
             };
         @endphp
         <div style="display:flex;align-items:flex-start;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);
-                    background:{{ $isUnread ? 'rgba(249,115,22,.03)' : 'transparent' }};
+                    background:{{ $isUnread ? 'rgba(37,99,235,.04)' : 'transparent' }};
                     transition:background .1s;"
              onmouseenter="this.style.background='var(--bg-2)'"
-             onmouseleave="this.style.background='{{ $isUnread ? 'rgba(249,115,22,.03)' : 'transparent' }}'">
+             onmouseleave="this.style.background='{{ $isUnread ? 'rgba(37,99,235,.04)' : 'transparent' }}'">
 
             {{-- Icon --}}
             <div style="width:34px;height:34px;border-radius:8px;background:var(--bg-3);

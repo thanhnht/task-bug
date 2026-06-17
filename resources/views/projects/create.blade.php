@@ -202,7 +202,7 @@
         padding: 2px 7px;
         border-radius: 3px;
     }
-    .member-role.pm        { background: rgba(249,115,22,.15); color: var(--accent); }
+    .member-role.pm        { background: rgba(37,99,235,.15); color: var(--accent); }
     .member-role.developer { background: rgba(59,130,246,.15);  color: var(--blue); }
     .member-role.tester    { background: rgba(34,197,94,.15);   color: var(--green); }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Project, Task, TaskHistory, User};
+use App\Services\KpiService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -106,10 +107,45 @@ class DashboardController extends Controller
             ->limit(15)
             ->get();
 
+        // ── KPI ─────────────────────────────────────────────────────────────
+        $currentMonth      = now()->format('Y-m');
+        $myKpiScore        = KpiService::scoreForMonth($user->id, $currentMonth);
+        $myKpiTransactions = KpiService::transactionsForMonth($user->id, $currentMonth);
+
+        // PM/Admin thấy điểm KPI của toàn team
+        $isPmOrAdmin = $user->isAdmin() || DB::table('project_members')
+            ->where('user_id', $user->id)->where('role', 'pm')->exists();
+
+        $teamKpiData = collect();
+        if ($isPmOrAdmin) {
+            $memberIds = DB::table('project_members')
+                ->whereIn('project_id', $projectIds)
+                ->where('user_id', '!=', $user->id)
+                ->pluck('user_id')
+                ->unique()
+                ->toArray();
+
+            if (!empty($memberIds)) {
+                $scores = KpiService::teamScores($memberIds, $currentMonth);
+                $teamKpiData = User::whereIn('id', $memberIds)
+                    ->get(['id', 'full_name'])
+                    ->map(fn($u) => (object)[
+                        'user'  => $u,
+                        'score' => $scores[$u->id] ?? KpiService::BASE_SCORE,
+                        'role'  => DB::table('project_members')
+                            ->where('user_id', $u->id)
+                            ->whereIn('project_id', $projectIds)
+                            ->value('role'),
+                    ])
+                    ->sortBy('score');
+            }
+        }
+
         return view('dashboard', compact(
             'user', 'myTasks', 'projects',
             'bugStats', 'retestCount', 'rejectFromDone',
-            'qualityByProject', 'bugPerformance', 'recentActivity'
+            'qualityByProject', 'bugPerformance', 'recentActivity',
+            'myKpiScore', 'myKpiTransactions', 'isPmOrAdmin', 'teamKpiData', 'currentMonth'
         ));
     }
 }

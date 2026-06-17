@@ -94,13 +94,14 @@ class ProjectController extends Controller
             $query->whereNull('parent_id');
         }
 
+        if (request()->filled('search'))      $query->where(fn($q) => $q->where('title', 'like', '%'.request('search').'%')->orWhere('code', 'like', '%'.request('search').'%'));
         if (request()->filled('status'))      $query->where('status', request('status'));
         if ($typeFilter)                      $query->where('type', $typeFilter);
         if (request()->filled('assigned_to')) $query->where('assigned_to', request('assigned_to'));
         if (request()->filled('date_from'))   $query->whereDate('created_at', '>=', request('date_from'));
         if (request()->filled('date_to'))     $query->whereDate('created_at', '<=', request('date_to'));
 
-        $rootTasks = $query->orderByDesc('created_at')->get();
+        $rootTasks = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
         $members   = $project->members()->orderBy('full_name')->get();
         $employees = User::where('is_active', true)->where('role', 'employee')->orderBy('full_name')->get();
 

@@ -145,7 +145,8 @@
                             ? (int) round(($task->children_count - $task->pending_children_count) / $task->children_count * 100)
                             : ($task->status === 'done' ? 100 : 0);
                     @endphp
-                    <tr onclick="location.href='{{ route('projects.tasks.show', [$project, $task]) }}'" class="task-row">
+                    <tr onclick="location.href='{{ route('projects.tasks.show', [$project, $task]) }}'"
+                        class="task-row {{ $task->due_date && $task->due_date->isPast() && !in_array($task->status, ['done','review_approved']) ? 'task-overdue' : '' }}">
                         <td><span class="task-code-mono">{{ $task->code }}</span></td>
                         <td>
                             <div class="task-title-cell">{{ $task->title }}</div>
@@ -170,7 +171,19 @@
                         </td>
                         <td>
                             @if ($task->due_date)
-                                <span style="font-size:12px;{{ $task->due_date->isPast() && $task->status !== 'done' ? 'color:var(--red)' : 'color:var(--text-3)' }}">
+                                @php
+                                    $isDone  = in_array($task->status, ['done', 'review_approved']);
+                                    $daysLeft = now()->startOfDay()->diffInDays($task->due_date->startOfDay(), false);
+                                    $dlClass = $isDone ? 'dl-ok'
+                                        : ($daysLeft < 0 ? 'dl-overdue'
+                                        : ($daysLeft <= 2 ? 'dl-soon' : 'dl-ok'));
+                                @endphp
+                                <span class="deadline-badge {{ $dlClass }}">
+                                    @if (!$isDone && $daysLeft < 0)
+                                        <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.75 3.5h1.5v5h-1.5v-5zm0 6h1.5v1.5h-1.5V10.5z"/></svg>
+                                    @elseif (!$isDone && $daysLeft <= 2)
+                                        <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zM7.25 4h1.5v4.5l2.5 1.5-.75 1.25-3.25-2V4z"/></svg>
+                                    @endif
                                     {{ $task->due_date->format('d/m/Y') }}
                                 </span>
                             @else
@@ -236,7 +249,7 @@
     .filter-control:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-glow); }
     .filter-control.filter-active {
         border-color: var(--accent);
-        background: rgba(249,115,22,.06);
+        background: rgba(37,99,235,.06);
         color: var(--accent); font-weight: 500;
     }
     .filter-actions { display:flex;align-items:center;gap:6px;margin-left:4px; }
@@ -276,6 +289,8 @@
     }
     .task-row:last-child { border-bottom: none; }
     .task-row:hover { background: var(--bg-2); }
+    .task-row.task-overdue { background: rgba(220,38,38,.04); box-shadow: inset 3px 0 0 var(--red); }
+    .task-row.task-overdue:hover { background: rgba(220,38,38,.08); }
     .task-row td { padding: 10px 12px; vertical-align: middle; }
 
     .task-code-mono {
@@ -292,7 +307,7 @@
     .type-chip-xs.type-subtask  { background:rgba(100,116,139,.15); color:var(--text-2); }
     .type-chip-xs.type-bug      { background:rgba(239,68,68,.12);   color:var(--red); }
     .type-chip-xs.type-research { background:rgba(168,85,247,.12);  color:#a855f7; }
-    .type-chip-xs.type-fix      { background:rgba(249,115,22,.12);  color:var(--accent); }
+    .type-chip-xs.type-fix      { background:rgba(37,99,235,.12);  color:var(--accent); }
     .type-chip-xs.type-test     { background:rgba(34,197,94,.12);   color:var(--green); }
 
     .priority-pill {
@@ -318,9 +333,18 @@
         letter-spacing: .04em; padding: 3px 8px; border-radius: 4px; white-space: nowrap;
     }
     .status-pill.status-todo            { background: var(--bg-3); color: var(--text-3); }
-    .status-pill.status-in_progress     { background: rgba(249,115,22,.15); color: var(--accent); }
+    .status-pill.status-in_progress     { background: rgba(37,99,235,.15); color: var(--accent); }
     .status-pill.status-ready_to_test { background: rgba(234,179,8,.12); color: var(--yellow); }
     .status-pill.status-done            { background: rgba(34,197,94,.12); color: var(--green); }
+
+    .deadline-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 11.5px; font-family: var(--font-mono);
+        padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+    }
+    .deadline-badge.dl-ok       { color: var(--text-3); background: transparent; }
+    .deadline-badge.dl-soon     { color: #92400e; background: rgba(245,158,11,.15); border: 1px solid rgba(245,158,11,.3); }
+    .deadline-badge.dl-overdue  { color: #991b1b; background: rgba(220,38,38,.12); border: 1px solid rgba(220,38,38,.3); font-weight: 700; }
 
     .alert { padding:10px 14px; border-radius:6px; font-size:13px; }
     .alert-success { background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.25); color:var(--green); }

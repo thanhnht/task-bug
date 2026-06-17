@@ -30,22 +30,22 @@
 <div class="stats-grid">
     <div class="stat-card blue">
         <div class="stat-label">Tổng tài khoản</div>
-        <div class="stat-value">{{ $users->total() }}</div>
+        <div class="stat-value">{{ $stats['total'] }}</div>
         <div class="stat-sub">nhân viên</div>
     </div>
     <div class="stat-card green">
         <div class="stat-label">Đang hoạt động</div>
-        <div class="stat-value">{{ $users->where('is_active', true)->count() }}</div>
+        <div class="stat-value">{{ $stats['active'] }}</div>
         <div class="stat-sub">tài khoản</div>
     </div>
     <div class="stat-card orange">
         <div class="stat-label">Chưa đổi pass</div>
-        <div class="stat-value">{{ $users->where('is_first_login', true)->count() }}</div>
+        <div class="stat-value">{{ $stats['first_login'] }}</div>
         <div class="stat-sub">lần đầu đăng nhập</div>
     </div>
     <div class="stat-card red">
         <div class="stat-label">Đang bị khoá</div>
-        <div class="stat-value">{{ $users->filter(fn($u) => $u->isLocked())->count() }}</div>
+        <div class="stat-value">{{ $stats['locked'] }}</div>
         <div class="stat-sub">tài khoản</div>
     </div>
 </div>
@@ -106,7 +106,7 @@
                     </td>
                     <td>
                         @if($user->is_first_login)
-                            <span class="badge" style="background:rgba(249,115,22,.15);color:var(--accent)">
+                            <span class="badge" style="background:rgba(37,99,235,.15);color:var(--accent)">
                                 Chưa đổi pass
                             </span>
                         @else

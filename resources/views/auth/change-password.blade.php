@@ -199,7 +199,7 @@
             { w:'0%',   color:'',                text:'' },
             { w:'25%',  color:'var(--red)',       text:'Rất yếu' },
             { w:'50%',  color:'var(--yellow)',    text:'Yếu' },
-            { w:'75%',  color:'#f97316',          text:'Trung bình' },
+            { w:'75%',  color:'#f59e0b',          text:'Trung bình' },
             { w:'100%', color:'var(--green)',     text:'Mạnh' },
         ][score];
         bar.style.width       = cfg.w;

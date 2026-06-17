@@ -35,6 +35,76 @@
     </div>
 </div>
 
+{{-- ── KPI cá nhân (Dev / Tester) ──────────────────────────────────────────── --}}
+@php
+    $kpiClass = $myKpiScore >= 90 ? 'green' : ($myKpiScore >= 70 ? 'yellow' : 'red');
+    $kpiLabel = $myKpiScore >= 90 ? 'Tốt' : ($myKpiScore >= 70 ? 'Cần cải thiện' : 'Cảnh báo');
+@endphp
+<div class="dash-section-title">KPI Tháng {{ \Carbon\Carbon::createFromFormat('Y-m', $currentMonth)->format('m/Y') }}</div>
+<div class="dash-grid-4" style="margin-bottom:16px">
+    <div class="dash-stat-card {{ $kpiClass }}">
+        <div class="dash-stat-label">Điểm KPI của tôi</div>
+        <div class="dash-stat-value">{{ number_format($myKpiScore, 1) }}</div>
+        <div class="dash-stat-sub">{{ $kpiLabel }} · Cơ sở: 100 / tháng</div>
+    </div>
+    <div class="dash-stat-card">
+        <div class="dash-stat-label">Số lần bị trừ</div>
+        <div class="dash-stat-value" style="color:var(--red)">{{ $myKpiTransactions->count() }}</div>
+        <div class="dash-stat-sub">sự kiện tháng này</div>
+    </div>
+    <div class="dash-stat-card">
+        <div class="dash-stat-label">Tổng trừ</div>
+        <div class="dash-stat-value" style="color:var(--red)">{{ number_format($myKpiTransactions->sum('points'), 1) }}</div>
+        <div class="dash-stat-sub">điểm</div>
+    </div>
+    <div class="dash-stat-card blue">
+        <div class="dash-stat-label">Cơ sở</div>
+        <div class="dash-stat-value">100</div>
+        <div class="dash-stat-sub">điểm / tháng</div>
+    </div>
+</div>
+
+@if ($myKpiTransactions->isNotEmpty())
+<div class="card" style="margin-bottom:28px">
+    <div class="card-header"><span class="card-title">Lịch sử biến động KPI tháng này</span></div>
+    <table class="dash-table">
+        <thead>
+            <tr>
+                <th>Thời gian</th>
+                <th>Lý do</th>
+                <th style="width:80px;text-align:right">Điểm</th>
+                <th style="width:100px">Dự án</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($myKpiTransactions as $tx)
+            <tr>
+                <td style="font-family:var(--font-mono);font-size:11px;color:var(--text-3);white-space:nowrap">
+                    {{ $tx->created_at->format('d/m H:i') }}
+                </td>
+                <td style="font-size:13px">
+                    @if($tx->task)
+                        <a href="{{ route('projects.tasks.show', [$tx->project_id ?? 0, $tx->task_id]) }}"
+                           style="color:var(--accent);font-family:var(--font-mono);font-size:11px;margin-right:6px">
+                            {{ $tx->task->code }}
+                        </a>
+                    @endif
+                    {{ $tx->reason }}
+                </td>
+                <td style="text-align:right;font-family:var(--font-mono);font-weight:700;
+                    color:{{ $tx->points < 0 ? 'var(--red)' : 'var(--green)' }}">
+                    {{ $tx->points > 0 ? '+' : '' }}{{ number_format($tx->points, 2) }}
+                </td>
+                <td style="font-family:var(--font-mono);font-size:11px;color:var(--text-3)">
+                    {{ $tx->project?->code ?? '—' }}
+                </td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+</div>
+@endif
+
 <div class="dash-layout">
 <div class="dash-main">
 
@@ -133,6 +203,63 @@
                         </div>
                     </td>
                 </tr>
+            @endforeach
+        </tbody>
+    </table>
+</div>
+@endif
+
+{{-- ── KPI Team (chỉ PM / Admin) ───────────────────────────────────────────── --}}
+@if ($isPmOrAdmin && $teamKpiData->isNotEmpty())
+<div class="dash-section-title" style="margin-top:8px">Cảnh báo KPI Team — tháng {{ \Carbon\Carbon::createFromFormat('Y-m', $currentMonth)->format('m/Y') }}</div>
+<div class="card" style="margin-bottom:20px">
+    <table class="dash-table">
+        <thead>
+            <tr>
+                <th>Thành viên</th>
+                <th style="width:80px">Vai trò</th>
+                <th style="width:110px">Điểm KPI</th>
+                <th style="width:80px;text-align:right">Trừ</th>
+                <th style="width:130px">Trạng thái</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($teamKpiData as $kd)
+            @php
+                $sc = $kd->score;
+                $barColor = $sc >= 90 ? 'var(--green)' : ($sc >= 70 ? 'var(--yellow)' : 'var(--red)');
+                $badge    = $sc >= 90 ? 'Tốt' : ($sc >= 70 ? 'Cần cải thiện' : 'Cảnh báo');
+                $deducted = round($sc - \App\Services\KpiService::BASE_SCORE, 2);
+            @endphp
+            <tr>
+                <td style="font-weight:500">{{ $kd->user->full_name }}</td>
+                <td>
+                    @if($kd->role)
+                        <span class="role-tag role-{{ $kd->role }}">{{ \App\Models\Project::ROLE_LABELS[$kd->role] ?? $kd->role }}</span>
+                    @else —
+                    @endif
+                </td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <div style="flex:1;height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden">
+                            <div style="height:100%;width:{{ $sc }}%;background:{{ $barColor }};border-radius:3px"></div>
+                        </div>
+                        <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:{{ $barColor }};min-width:34px">
+                            {{ number_format($sc, 1) }}
+                        </span>
+                    </div>
+                </td>
+                <td style="text-align:right;font-family:var(--font-mono);font-size:12px;
+                    color:{{ $deducted < 0 ? 'var(--red)' : 'var(--text-3)' }}">
+                    {{ $deducted < 0 ? number_format($deducted, 1) : '—' }}
+                </td>
+                <td>
+                    <span style="font-size:11px;font-family:var(--font-mono);font-weight:700;
+                        color:{{ $sc >= 90 ? 'var(--green)' : ($sc >= 70 ? 'var(--yellow)' : 'var(--red)') }}">
+                        {{ $badge }}
+                    </span>
+                </td>
+            </tr>
             @endforeach
         </tbody>
     </table>
@@ -260,7 +387,7 @@
         letter-spacing: .04em; padding: 2px 6px; border-radius: 3px; white-space: nowrap;
     }
     .status-pill-xs.status-todo            { background: var(--bg-3); color: var(--text-2); }
-    .status-pill-xs.status-in_progress     { background: rgba(249,115,22,.12); color: var(--accent); }
+    .status-pill-xs.status-in_progress     { background: rgba(37,99,235,.12); color: var(--accent); }
     .status-pill-xs.status-ready_to_test   { background: rgba(180,83,9,.10);   color: var(--yellow); }
     .status-pill-xs.status-done            { background: rgba(22,163,74,.10);  color: var(--green); }
 

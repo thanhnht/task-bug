@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Project, Task, User, UserNotification};
+use App\Services\KpiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -38,7 +39,7 @@ class TaskController extends Controller
         }
 
         $members = $project->members()->orderBy('full_name')->get();
-        $tasks   = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+        $tasks   = $query->orderByDesc('created_at')->paginate(10)->withQueryString();
 
         return view('tasks.index', compact('project', 'tasks', 'role', 'members'));
     }
@@ -107,6 +108,7 @@ class TaskController extends Controller
             'creator', 'assignee', 'confirmer',
             'children.assignee', 'children.creator',
             'histories.actor',
+            'linkedStory.histories.actor',
         ]);
 
         $role       = $project->roleOf(Auth::user());
@@ -115,7 +117,15 @@ class TaskController extends Controller
         $testers    = $allMembers->filter(fn($m) => $m->pivot->role === 'tester');
         $transitions = $task->nextTransitions(Auth::user());
 
-        return view('tasks.show', compact('project', 'task', 'role', 'members', 'testers', 'allMembers', 'transitions'));
+        // Stories đã Done trong project (cho production bug selector)
+        $doneStories = $project->tasks()
+            ->whereNull('parent_id')
+            ->where('status', Task::STATUS_DONE)
+            ->where('id', '!=', $task->id)
+            ->orderBy('code')
+            ->get(['id', 'code', 'title']);
+
+        return view('tasks.show', compact('project', 'task', 'role', 'members', 'testers', 'allMembers', 'transitions', 'doneStories'));
     }
 
     // ── Cập nhật task chính ───────────────────────────────────────────────
@@ -248,6 +258,16 @@ class TaskController extends Controller
             $this->notifyPmsForReviewApproved($task, $project);
         }
 
+        // ── KPI deductions ────────────────────────────────────────────────
+        $task->refresh();
+        if ($request->status === Task::STATUS_DONE) {
+            KpiService::deductForLateness($task);
+        }
+        if ($oldStatus === Task::STATUS_READY_TO_TEST
+            && in_array($request->status, [Task::STATUS_REVIEW_APPROVED, Task::STATUS_DONE])) {
+            KpiService::deductForRttSoak($task, Auth::id());
+        }
+
         return back()->with('success', $result['message']);
     }
 
@@ -257,21 +277,39 @@ class TaskController extends Controller
         $this->mustBeMember($project);
         abort_if($task->project_id !== $project->id, 404);
 
-        // Bug chỉ được tạo khi task đang ở trạng thái Ready to Test
-        if ($request->input('type') === Task::TYPE_BUG && $task->status !== Task::STATUS_READY_TO_TEST) {
+        $isProductionBug = $request->boolean('is_production_bug');
+
+        // Bug thường chỉ được tạo khi task đang ở RTT; production bug không bị hạn chế
+        if ($request->input('type') === Task::TYPE_BUG
+            && !$isProductionBug
+            && $task->status !== Task::STATUS_READY_TO_TEST) {
             return back()->withErrors([
                 'child_error' => 'Bug chỉ có thể tạo khi task đang ở trạng thái Ready to Test.',
             ]);
         }
 
+        // Chỉ PM hoặc Tester được tạo Production Bug
+        if ($isProductionBug) {
+            $actorRole = $project->roleOf(Auth::user());
+            if (!Auth::user()->isAdmin() && !in_array($actorRole, ['pm', 'tester'])) {
+                return back()->withErrors(['child_error' => 'Chỉ PM hoặc Tester mới có thể tạo Production Bug.']);
+            }
+        }
+
         $data = $request->validate([
-            'type'             => 'required|in:task,subtask,bug,research,fix,test',
-            'title'            => 'required|string|max:200',
-            'description'      => 'nullable|string|max:2000',
-            'estimated_hours'  => 'nullable|numeric|min:0.5|max:999',
-            'start_date'       => 'nullable|date',
-            'due_date'         => 'nullable|date|after_or_equal:start_date',
-            'assigned_to'      => [
+            'type'              => 'required|in:task,subtask,bug,research,fix,test',
+            'title'             => 'required|string|max:200',
+            'description'       => 'nullable|string|max:2000',
+            'estimated_hours'   => 'nullable|numeric|min:0.5|max:999',
+            'start_date'        => 'nullable|date',
+            'due_date'          => 'nullable|date|after_or_equal:start_date',
+            'is_production_bug' => 'nullable|boolean',
+            'linked_story_id'   => [
+                'nullable',
+                'required_if:is_production_bug,1',
+                'exists:tasks,id',
+            ],
+            'assigned_to'       => [
                 'nullable', 'exists:users,id',
                 function ($_attr, $value, $fail) use ($project) {
                     if ($value && !$project->hasMember(User::find($value))) {
@@ -281,23 +319,43 @@ class TaskController extends Controller
             ],
         ]);
 
+        // Auto-set due_date cho bug dựa trên priority (SLA)
+        if ($data['type'] === Task::TYPE_BUG && empty($data['due_date'])) {
+            $slaDays = match($task->priority) {
+                'critical' => 0,
+                'high'     => 1,
+                default    => 2,
+            };
+            $data['due_date'] = now()->addDays($slaDays)->toDateString();
+        }
+
         $child = $project->tasks()->create([
-            'code'            => Task::nextCode(),
-            'parent_id'       => $task->id,
-            'type'            => $data['type'],
-            'title'           => $data['title'],
-            'description'     => $data['description'] ?? null,
-            'estimated_hours' => $data['estimated_hours'] ?? null,
-            'start_date'      => $data['start_date'] ?? null,
-            'due_date'        => $data['due_date'] ?? null,
-            'assigned_to'     => $data['assigned_to'] ?? null,
-            'priority'        => $task->priority,
-            'status'          => Task::STATUS_TODO,
-            'created_by'      => Auth::id(),
+            'code'              => Task::nextCode(),
+            'parent_id'         => $task->id,
+            'type'              => $data['type'],
+            'is_production_bug' => $data['is_production_bug'] ?? false,
+            'linked_story_id'   => $data['linked_story_id'] ?? null,
+            'title'             => $data['title'],
+            'description'       => $data['description'] ?? null,
+            'estimated_hours'   => $data['estimated_hours'] ?? null,
+            'start_date'        => $data['start_date'] ?? null,
+            'due_date'          => $data['due_date'] ?? null,
+            'assigned_to'       => $data['assigned_to'] ?? null,
+            'priority'          => $task->priority,
+            'status'            => Task::STATUS_TODO,
+            'created_by'        => Auth::id(),
         ]);
 
         if ($child->assigned_to) {
             $this->notifyAssigned($child, $project, $child->assigned_to);
+        }
+
+        // ── KPI deductions ────────────────────────────────────────────────
+        if ($child->type === Task::TYPE_BUG) {
+            KpiService::deductForBugCreated($task);
+            if ($child->is_production_bug) {
+                KpiService::deductForProductionBug($child);
+            }
         }
 
         return back()->with('success', 'Task con đã được thêm.');
@@ -315,10 +373,21 @@ class TaskController extends Controller
             'note'   => 'nullable|string|max:500',
         ]);
 
-        $result = $child->transitionTo($request->status, Auth::user(), $request->note);
+        $oldChildStatus = $child->status;
+        $result         = $child->transitionTo($request->status, Auth::user(), $request->note);
 
         if (!$result['ok']) {
             return back()->withErrors(['child_transition' => $result['message']]);
+        }
+
+        // ── KPI deductions ────────────────────────────────────────────────
+        $child->refresh();
+        if ($request->status === Task::STATUS_DONE) {
+            KpiService::deductForLateness($child);
+        }
+        if ($oldChildStatus === Task::STATUS_READY_TO_TEST
+            && in_array($request->status, [Task::STATUS_REVIEW_APPROVED, Task::STATUS_DONE])) {
+            KpiService::deductForRttSoak($child, Auth::id());
         }
 
         return back()->with('success', $result['message']);

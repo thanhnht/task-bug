@@ -25,17 +25,17 @@
 
         :root {
             /* ── Content area ── */
-            --bg-0: #f3f4f6;
+            --bg-0: #f0f5ff;
             --bg-1: #ffffff;
-            --bg-2: #f9fafb;
-            --bg-3: #f3f4f6;
-            --border: #e5e7eb;
-            --border-lit: #d1d5db;
+            --bg-2: #f8faff;
+            --bg-3: #eef2ff;
+            --border: #dbeafe;
+            --border-lit: #bfdbfe;
 
-            /* ── Accent ── */
-            --accent: #f97316;
-            --accent-dim: #fff7ed;
-            --accent-glow: rgba(249, 115, 22, .12);
+            /* ── Accent (blue) ── */
+            --accent: #2563eb;
+            --accent-dim: #eff6ff;
+            --accent-glow: rgba(37, 99, 235, .12);
 
             /* ── Semantic colors ── */
             --green: #16a34a;
@@ -48,12 +48,12 @@
             --text-2: #374151;
             --text-3: #6b7280;
 
-            /* ── Sidebar (dark) ── */
-            --sb-bg: #111827;
-            --sb-border: #1f2937;
-            --sb-hover: #1f2937;
-            --sb-text: #9ca3af;
-            --sb-text-hi: #f9fafb;
+            /* ── Sidebar (blue) ── */
+            --sb-bg: #1e40af;
+            --sb-border: #1d4ed8;
+            --sb-hover: rgba(255, 255, 255, .08);
+            --sb-text: #bfdbfe;
+            --sb-text-hi: #eff6ff;
 
             --sidebar-w: 240px;
             --header-h: 56px;
@@ -153,7 +153,7 @@
             font-family: var(--font-mono);
             letter-spacing: .12em;
             text-transform: uppercase;
-            color: #4b5563;
+            color: #93c5fd;
         }
 
         .sidebar-nav {
@@ -197,8 +197,8 @@
         }
 
         .nav-item.active {
-            background: rgba(249, 115, 22, .18);
-            color: #fb923c;
+            background: rgba(255, 255, 255, .18);
+            color: #eff6ff;
             font-weight: 500;
         }
 
@@ -245,15 +245,15 @@
         .user-avatar {
             width: 32px;
             height: 32px;
-            background: #1f2937;
-            border: 1px solid #374151;
+            background: #1d4ed8;
+            border: 1px solid #3b82f6;
             border-radius: 50%;
             display: grid;
             place-items: center;
             font-family: var(--font-mono);
             font-size: 11px;
             font-weight: 700;
-            color: #fb923c;
+            color: #eff6ff;
             flex-shrink: 0;
         }
 
@@ -279,11 +279,11 @@
         }
 
         .user-role.admin {
-            color: #fb923c;
+            color: #bfdbfe;
         }
 
         .user-role.employee {
-            color: #60a5fa;
+            color: #93c5fd;
         }
 
         /* ── Main area ─────────────────────────────────────────────────────── */
@@ -902,7 +902,7 @@
             display: inline-block;
         }
         .status-pill.status-todo            { background: var(--bg-3); color: var(--text-2); }
-        .status-pill.status-in_progress     { background: rgba(249,115,22,.12); color: var(--accent); }
+        .status-pill.status-in_progress     { background: rgba(37,99,235,.12); color: var(--accent); }
         .status-pill.status-ready_to_test   { background: rgba(180,83,9,.10);   color: var(--yellow); }
         .status-pill.status-review_approved { background: rgba(37,99,235,.12);  color: var(--blue); }
         .status-pill.status-done            { background: rgba(22,163,74,.10);  color: var(--green); }
@@ -949,7 +949,7 @@
         .type-chip-xs.type-subtask  { background: rgba(100,116,139,.12); color: var(--text-2); }
         .type-chip-xs.type-bug      { background: rgba(220,38,38,.10);   color: var(--red); }
         .type-chip-xs.type-research { background: rgba(168,85,247,.10);  color: #7c3aed; }
-        .type-chip-xs.type-fix      { background: rgba(249,115,22,.10);  color: var(--accent); }
+        .type-chip-xs.type-fix      { background: rgba(37,99,235,.10);  color: var(--accent); }
         .type-chip-xs.type-test     { background: rgba(22,163,74,.10);   color: var(--green); }
 
         /* ── Role tags ─────────────────────────────────────────────────────── */
@@ -958,7 +958,7 @@
             text-transform: uppercase; letter-spacing: .08em;
             padding: 2px 7px; border-radius: 3px; display: inline-block;
         }
-        .role-tag.role-pm        { background: rgba(249,115,22,.12); color: var(--accent); }
+        .role-tag.role-pm        { background: rgba(37,99,235,.12); color: var(--accent); }
         .role-tag.role-developer { background: rgba(37,99,235,.12);  color: var(--blue); }
         .role-tag.role-tester    { background: rgba(22,163,74,.10);  color: var(--green); }
         .role-tag.role-admin     { background: rgba(220,38,38,.10);  color: var(--red); }
@@ -1007,6 +1007,14 @@
 
                     <div class="sidebar-divider"></div>
                 @endif
+
+                <a href="{{ route('employee.dashboard') }}"
+                    class="nav-item {{ request()->routeIs('employee.dashboard') ? 'active' : '' }}">
+                    <svg viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M1 1h6v6H1V1zm8 0h6v6H9V1zM1 9h6v6H1V9zm8 0h6v6H9V9z"/>
+                    </svg>
+                    Dashboard
+                </a>
 
                 <a href="{{ route('projects.index') }}"
                     class="nav-item {{ request()->routeIs('projects.*') ? 'active' : '' }}">

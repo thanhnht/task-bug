@@ -56,6 +56,7 @@ class Task extends Model
     // ── Fillable ───────────────────────────────────────────────────────────
     protected $fillable = [
         'code', 'project_id', 'parent_id', 'type',
+        'is_production_bug', 'linked_story_id',
         'title', 'description', 'priority', 'status',
         'start_date', 'due_date', 'estimated_hours',
         'created_by', 'assigned_to', 'confirmed_by',
@@ -63,21 +64,24 @@ class Task extends Model
     ];
 
     protected $casts = [
-        'start_date' => 'date',
-        'due_date'   => 'date',
-        'started_at' => 'datetime',
-        'ready_at'   => 'datetime',
-        'done_at'    => 'datetime',
+        'start_date'        => 'date',
+        'due_date'          => 'date',
+        'started_at'        => 'datetime',
+        'ready_at'          => 'datetime',
+        'done_at'           => 'datetime',
+        'is_production_bug' => 'boolean',
     ];
 
     // ── Relations ──────────────────────────────────────────────────────────
-    public function project(): BelongsTo  { return $this->belongsTo(Project::class); }
-    public function parent(): BelongsTo   { return $this->belongsTo(Task::class, 'parent_id'); }
-    public function children(): HasMany   { return $this->hasMany(Task::class, 'parent_id')->orderBy('created_at'); }
-    public function creator(): BelongsTo  { return $this->belongsTo(User::class, 'created_by'); }
-    public function assignee(): BelongsTo { return $this->belongsTo(User::class, 'assigned_to'); }
-    public function confirmer(): BelongsTo{ return $this->belongsTo(User::class, 'confirmed_by'); }
-    public function histories(): HasMany  { return $this->hasMany(TaskHistory::class)->orderByDesc('created_at'); }
+    public function project(): BelongsTo      { return $this->belongsTo(Project::class); }
+    public function parent(): BelongsTo       { return $this->belongsTo(Task::class, 'parent_id'); }
+    public function children(): HasMany       { return $this->hasMany(Task::class, 'parent_id')->orderBy('created_at'); }
+    public function creator(): BelongsTo      { return $this->belongsTo(User::class, 'created_by'); }
+    public function assignee(): BelongsTo     { return $this->belongsTo(User::class, 'assigned_to'); }
+    public function confirmer(): BelongsTo    { return $this->belongsTo(User::class, 'confirmed_by'); }
+    public function histories(): HasMany      { return $this->hasMany(TaskHistory::class)->orderByDesc('created_at'); }
+    public function linkedStory(): BelongsTo  { return $this->belongsTo(Task::class, 'linked_story_id'); }
+    public function productionBugs(): HasMany { return $this->hasMany(Task::class, 'linked_story_id')->where('is_production_bug', true); }
 
     // ── Hierarchy helpers ──────────────────────────────────────────────────
     public function isMainTask(): bool  { return $this->parent_id === null; }

@@ -157,7 +157,7 @@
         color: var(--text-3);
     }
 
-/* Empty state */
+    /* Empty state */
     .empty-state {
         text-align: center;
         padding: 80px 24px;

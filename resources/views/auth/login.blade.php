@@ -12,7 +12,7 @@
         :root {
             --bg-0: #0d0f12; --bg-1: #13161b; --bg-2: #1c2028;
             --border: #2e3440; --border-lit: #404858;
-            --accent: #f97316; --accent-dim: #7c3a12; --accent-glow: rgba(249,115,22,.18);
+            --accent: #3b82f6; --accent-dim: #1e3a8a; --accent-glow: rgba(59,130,246,.18);
             --red: #ef4444; --text-1: #f1f5f9; --text-2: #94a3b8; --text-3: #475569;
             --font-mono: 'Space Mono', monospace; --font-body: 'DM Sans', sans-serif;
         }
@@ -31,8 +31,8 @@
             position: fixed;
             inset: 0;
             background-image:
-                linear-gradient(rgba(249,115,22,.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(249,115,22,.03) 1px, transparent 1px);
+                linear-gradient(rgba(59,130,246,.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,.03) 1px, transparent 1px);
             background-size: 40px 40px;
             pointer-events: none;
         }
@@ -43,7 +43,7 @@
             position: fixed;
             top: -200px; right: -200px;
             width: 600px; height: 600px;
-            background: radial-gradient(circle, rgba(249,115,22,.08) 0%, transparent 70%);
+            background: radial-gradient(circle, rgba(59,130,246,.08) 0%, transparent 70%);
             pointer-events: none;
         }
 

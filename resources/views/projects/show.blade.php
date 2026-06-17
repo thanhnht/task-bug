@@ -67,12 +67,18 @@
         </div>
 
         {{-- Filter bar --}}
-        @php $hasFilter = request()->hasAny(['status','type','assigned_to','date_from','date_to']); @endphp
+        @php $hasFilter = request()->hasAny(['search','status','type','assigned_to','date_from','date_to']); @endphp
         <form method="GET" action="{{ route('projects.show', $project) }}" class="filter-strip">
 
             <svg class="filter-icon-svg" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M1 2h14l-5 6v5l-4-2V8L1 2z"/>
             </svg>
+
+            <div class="filter-group">
+                <label class="filter-label">Tìm kiếm</label>
+                <input type="text" name="search" class="filter-control filter-control--search {{ request('search') ? 'filter-active' : '' }}"
+                       placeholder="Tiêu đề / code..." value="{{ request('search') }}">
+            </div>
 
             <div class="filter-group">
                 <label class="filter-label">Trạng thái</label>
@@ -141,7 +147,9 @@
         @else
         <div class="story-list">
             @foreach($rootTasks as $task)
-            <a href="{{ route('projects.tasks.show', [$project, $task]) }}" class="story-row">
+            <a href="{{ route('projects.tasks.show', [$project, $task]) }}"
+               class="story-row {{ $task->due_date && $task->due_date->isPast() && $task->status !== 'done' ? 'story-row--overdue' : '' }}"
+>
                 <div class="story-row-left">
                     <span class="story-code">{{ $task->code }}</span>
                     <span class="type-chip-xs type-{{ $task->type }}">{{ $task->typeLabel() }}</span>
@@ -173,6 +181,11 @@
             </a>
             @endforeach
         </div>
+        @if($rootTasks->hasPages())
+        <div style="padding:14px 16px;border-top:1px solid var(--border)">
+            {{ $rootTasks->links() }}
+        </div>
+        @endif
         @endif
     </div>
 </div>
@@ -303,7 +316,7 @@
     .filter-control:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-glow); }
     .filter-control.filter-active {
         border-color: var(--accent);
-        background: rgba(249,115,22,.06);
+        background: rgba(37,99,235,.06);
         color: var(--accent); font-weight: 500;
     }
     .filter-actions { display:flex;align-items:center;gap:6px;margin-left:4px; }
@@ -342,6 +355,8 @@
     }
     .story-row:last-child { border-bottom: none; }
     .story-row:hover { background: var(--bg-2); }
+    .story-row.story-row--overdue { background: rgba(220,38,38,.04); box-shadow: inset 3px 0 0 var(--red); }
+    .story-row.story-row--overdue:hover { background: rgba(220,38,38,.08); }
     .story-row-left { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
     .story-code {
         font-family: var(--font-mono);
@@ -401,4 +416,5 @@
     }
 </style>
 @endpush
+
 

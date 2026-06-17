@@ -18,11 +18,19 @@ class AdminUserController extends Controller
 
     public function index()
     {
-        $users = User::where('role', User::ROLE_EMPLOYEE)
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+        $baseQuery = User::where('role', User::ROLE_EMPLOYEE);
 
-        return view('admin.users.index', compact('users'));
+        $stats = [
+            'total'        => (clone $baseQuery)->count(),
+            'active'       => (clone $baseQuery)->where('is_active', true)->count(),
+            'first_login'  => (clone $baseQuery)->where('is_first_login', true)->count(),
+            'locked'       => (clone $baseQuery)->whereNotNull('locked_until')
+                                ->where('locked_until', '>', now())->count(),
+        ];
+
+        $users = (clone $baseQuery)->orderBy('created_at', 'desc')->paginate(10);
+
+        return view('admin.users.index', compact('users', 'stats'));
     }
 
     // =========================================================================

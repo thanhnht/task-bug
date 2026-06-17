@@ -229,6 +229,43 @@
         @endif
     </div>
 
+    {{-- ── Production Bug warning ─────────────────────────────────────────── --}}
+    @if ($task->is_production_bug && $task->linkedStory)
+    @php
+        $origDev    = $task->linkedStory->histories->where('to_status', 'ready_to_test')->first()?->actor;
+        $origTester = $task->linkedStory->histories->whereIn('to_status', ['review_approved', 'done'])->first()?->actor;
+    @endphp
+    <div class="alert alert-danger" style="margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;margin-top:1px">
+            <path d="M8 1L1 14h14L8 1zm-1 8V6h2v3H7zm0 2h2v2H7v-2z"/>
+        </svg>
+        <div>
+            <strong>Production Bug — Lỗi lọt lưới từ tính năng đã nghiệm thu</strong>
+            <div style="margin-top:6px;font-size:13px">
+                Tính năng gốc:
+                <a href="{{ route('projects.tasks.show', [$project, $task->linkedStory]) }}"
+                   style="color:inherit;font-family:var(--font-mono)">{{ $task->linkedStory->code }}</a>
+                — {{ $task->linkedStory->title }}
+            </div>
+            <div style="margin-top:4px;font-size:13px;display:flex;gap:16px;flex-wrap:wrap">
+                @if($origDev)
+                    <span>
+                        <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>
+                        Dev: <strong>{{ $origDev->full_name }}</strong>
+                    </span>
+                @endif
+                @if($origTester)
+                    <span>
+                        <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z"/></svg>
+                        Tester: <strong>{{ $origTester->full_name }}</strong>
+                    </span>
+                @endif
+                <span style="color:var(--text-3)">KPI đã bị trừ -5 điểm mỗi người</span>
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- ── Inline edit form ────────────────────────────────────────────────── --}}
     <div id="editForm" style="display:none">
         <div class="card" style="margin-bottom:16px">
@@ -380,7 +417,11 @@
                         <input type="date" name="start_date" class="form-control">
                     </div>
                     <div class="form-group" style="margin:0">
-                        <label class="form-label">Ngày kết thúc</label>
+                        <label class="form-label">Ngày kết thúc
+                            <span id="bugSlaHint" style="display:none;font-size:10px;color:var(--text-3);font-weight:400">
+                                (tự động từ SLA nếu để trống)
+                            </span>
+                        </label>
                         <input type="date" name="due_date" class="form-control">
                     </div>
                     <div class="form-group" style="margin:0">
@@ -393,6 +434,36 @@
                         <textarea name="description" class="form-control" rows="2"
                             placeholder="Mô tả yêu cầu, điều kiện chấp nhận..."></textarea>
                     </div>
+
+                    {{-- Production Bug fields (chỉ PM / Tester, chỉ khi type = bug) --}}
+                    @if(in_array($role, ['pm', 'tester']) || Auth::user()->isAdmin())
+                    <div id="prodBugSection" class="form-group" style="grid-column:1/-1;margin:0;display:none;
+                        padding:12px;background:rgba(220,38,38,.04);border:1px solid rgba(220,38,38,.2);border-radius:6px">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:10px">
+                            <input type="checkbox" name="is_production_bug" id="isProdBug" value="1"
+                                onchange="toggleLinkedStory(this.checked)" style="width:14px;height:14px">
+                            <span style="font-size:13px;font-weight:500;color:var(--red)">
+                                Đây là Production Bug (lỗi lọt ra môi trường thực)
+                            </span>
+                        </label>
+                        <div id="linkedStoryWrap" style="display:none">
+                            <label class="form-label" style="font-size:12px">
+                                Story / Tính năng gốc phát sinh lỗi <span class="required">*</span>
+                            </label>
+                            <select name="linked_story_id" id="linkedStoryId" class="form-control">
+                                <option value="">— Chọn story đã Done —</option>
+                                @forelse ($doneStories as $s)
+                                    <option value="{{ $s->id }}">{{ $s->code }} — {{ Str::limit($s->title, 60) }}</option>
+                                @empty
+                                    <option disabled>Chưa có story nào Done trong dự án</option>
+                                @endforelse
+                            </select>
+                            <div style="font-size:11px;color:var(--red);margin-top:5px">
+                                ⚠ Khi lưu, hệ thống sẽ tự động trừ -5 điểm KPI của Dev và Tester từ story gốc.
+                            </div>
+                        </div>
+                    </div>
+                    @endif
                 </div>
                 <div style="margin-top:14px;display:flex;gap:8px">
                     <button type="submit" class="btn btn-primary btn-sm">Thêm task</button>
@@ -402,7 +473,7 @@
         </div>
 
         @forelse ($task->children as $child)
-            <div class="child-row type-border-{{ $child->type }}">
+            <div class="child-row type-border-{{ $child->type }} {{ $child->due_date && $child->due_date->isPast() && $child->status !== 'done' ? 'child-row--overdue' : '' }}">
                 <div class="child-left">
                     <span class="type-chip-sm type-{{ $child->type }}">{{ $child->typeLabel() }}</span>
                     <span class="child-code">{{ $child->code }}</span>
@@ -440,7 +511,7 @@
     @if ($bugCount > 0)
     <div id="tab-bugs-only" class="tab-panel card" style="display:none">
         @foreach ($task->children->where('type', 'bug') as $bug)
-            <div class="child-row type-border-bug">
+            <div class="child-row type-border-bug {{ $bug->due_date && $bug->due_date->isPast() && $bug->status !== 'done' ? 'child-row--overdue' : '' }}">
                 <div class="child-left">
                     <span class="type-chip-sm type-bug">Bug</span>
                     <span class="child-code">{{ $bug->code }}</span>
@@ -556,7 +627,7 @@
     .type-chip.type-subtask  { background:rgba(100,116,139,.12); color:var(--text-2); }
     .type-chip.type-bug      { background:rgba(220,38,38,.10);   color:var(--red); }
     .type-chip.type-research { background:rgba(168,85,247,.10);  color:#7c3aed; }
-    .type-chip.type-fix      { background:rgba(249,115,22,.10);  color:var(--accent); }
+    .type-chip.type-fix      { background:rgba(37,99,235,.10);  color:var(--accent); }
     .type-chip.type-test     { background:rgba(22,163,74,.10);   color:var(--green); }
 
     .type-chip-sm {
@@ -573,7 +644,7 @@
     .type-chip-sm.type-subtask  { background:rgba(100,116,139,.12); color:var(--text-2); }
     .type-chip-sm.type-bug      { background:rgba(220,38,38,.10);   color:var(--red); }
     .type-chip-sm.type-research { background:rgba(168,85,247,.10);  color:#7c3aed; }
-    .type-chip-sm.type-fix      { background:rgba(249,115,22,.10);  color:var(--accent); }
+    .type-chip-sm.type-fix      { background:rgba(37,99,235,.10);  color:var(--accent); }
     .type-chip-sm.type-test     { background:rgba(22,163,74,.10);   color:var(--green); }
 
     /* Priority chips */
@@ -651,6 +722,7 @@
         border-left:3px solid transparent;
     }
     .child-row:last-child { border-bottom:none; }
+    .child-row.child-row--overdue { background: rgba(220,38,38,.04); }
     .child-row.type-border-task     { border-left-color:var(--blue); }
     .child-row.type-border-subtask  { border-left-color:var(--text-3); }
     .child-row.type-border-bug      { border-left-color:var(--red); }
@@ -714,7 +786,6 @@
         const testers = opts.filter(o => o.dataset.role === 'tester');
 
         if (type === 'bug') {
-            // Bug phải giao cho Developer để fix
             label.textContent = 'Giao cho Developer';
             select.innerHTML = '';
             [placeholder, ...devs, ...pms, ...testers].forEach(o => select.appendChild(o));
@@ -725,6 +796,26 @@
             [placeholder, ...pms, ...devs, ...testers].forEach(o => select.appendChild(o));
             select.value = '';
         }
+
+        // Hiện/ẩn khu vực Production Bug
+        const prodSec = document.getElementById('prodBugSection');
+        const slaHint = document.getElementById('bugSlaHint');
+        if (prodSec) prodSec.style.display = type === 'bug' ? 'block' : 'none';
+        if (slaHint) slaHint.style.display = type === 'bug' ? 'inline' : 'none';
+        // Reset checkbox khi đổi type
+        const cb = document.getElementById('isProdBug');
+        if (cb && type !== 'bug') { cb.checked = false; toggleLinkedStory(false); }
+    }
+
+    function toggleLinkedStory(checked) {
+        const wrap = document.getElementById('linkedStoryWrap');
+        const sel  = document.getElementById('linkedStoryId');
+        if (!wrap) return;
+        wrap.style.display = checked ? 'block' : 'none';
+        if (sel) sel.required = checked;
+        // Khi là production bug: bỏ disable trên option bug (cho phép tạo trên Done task)
+        const bugOpt = [...document.getElementById('childType').options].find(o => o.value === 'bug');
+        if (bugOpt && checked) bugOpt.disabled = false;
     }
 
     function toggleChildForm() {
