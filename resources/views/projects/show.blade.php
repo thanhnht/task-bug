@@ -93,10 +93,12 @@
             <div class="filter-group">
                 <label class="filter-label">Loại</label>
                 <select name="type" class="filter-control {{ $typeFilter ? 'filter-active' : '' }}">
-                    <option value="" {{ $typeFilter === '' ? 'selected' : '' }}>Tất cả</option>
-                    @foreach(\App\Models\Task::TYPE_LABELS as $val => $label)
-                        <option value="{{ $val }}" {{ $typeFilter === $val ? 'selected' : '' }}>{{ $label }}</option>
-                    @endforeach
+                    <option value=""              {{ $typeFilter === ''              ? 'selected' : '' }}>Tất cả</option>
+                    <option value="task"          {{ $typeFilter === 'task'          ? 'selected' : '' }}>Task</option>
+                    <option value="bug"           {{ $typeFilter === 'bug'           ? 'selected' : '' }}>Bug (từ task)</option>
+                    <option value="production_bug"{{ $typeFilter === 'production_bug'? 'selected' : '' }}>Bug Production</option>
+                    <option value="subtask"       {{ $typeFilter === 'subtask'       ? 'selected' : '' }}>Subtask</option>
+                    <option value="test"          {{ $typeFilter === 'test'          ? 'selected' : '' }}>Test</option>
                 </select>
             </div>
 

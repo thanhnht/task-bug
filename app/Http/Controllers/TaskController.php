@@ -15,16 +15,27 @@ class TaskController extends Controller
         $this->mustBeMember($project);
 
         $query = $project->tasks()
-            ->whereNull('parent_id')
             ->with(['assignee', 'creator'])
             ->withCount([
                 'children',
                 'children as pending_children_count' => fn($q) => $q->whereNotIn('status', ['done']),
             ]);
 
+        // Type filter tách Bug Production vs Bug từ task
+        $typeParam = $request->input('type');
+        if ($typeParam === 'production_bug') {
+            $query->where('type', Task::TYPE_BUG)->where('is_production_bug', true)->whereNull('parent_id');
+        } elseif ($typeParam === 'bug') {
+            $query->where('type', Task::TYPE_BUG)
+                  ->where(fn($q) => $q->where('is_production_bug', false)->orWhereNull('is_production_bug'))
+                  ->whereNotNull('parent_id');
+        } else {
+            $query->whereNull('parent_id');
+            if ($request->filled('type')) $query->where('type', $typeParam);
+        }
+
         if ($request->filled('status'))      $query->where('status', $request->status);
         if ($request->filled('priority'))    $query->where('priority', $request->priority);
-        if ($request->filled('type'))        $query->where('type', $request->type);
         if ($request->filled('assigned_to')) $query->where('assigned_to', $request->assigned_to);
         if ($request->filled('date_from'))   $query->whereDate('created_at', '>=', $request->date_from);
         if ($request->filled('date_to'))     $query->whereDate('created_at', '<=', $request->date_to);

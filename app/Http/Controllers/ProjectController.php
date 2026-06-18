@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Project, User};
+use App\Models\{Project, Task, User};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -89,14 +89,25 @@ class ProjectController extends Controller
                 'children as pending_children_count' => fn($q) => $q->where('type', '!=', 'bug')->whereNotIn('status', ['done']),
             ]);
 
-        // Tất cả / Task → chỉ hiện root; loại khác (bug, subtask…) → hiện cả task con
-        if (!$typeFilter || $typeFilter === 'task') {
+        // Type filter với tách biệt Bug Production vs Bug từ task
+        if ($typeFilter === 'production_bug') {
+            // Bug gốc (root, is_production_bug = true)
+            $query->where('type', Task::TYPE_BUG)->where('is_production_bug', true)->whereNull('parent_id');
+        } elseif ($typeFilter === 'bug') {
+            // Bug con (từ task, không phải production)
+            $query->where('type', Task::TYPE_BUG)
+                  ->where(fn($q) => $q->where('is_production_bug', false)->orWhereNull('is_production_bug'))
+                  ->whereNotNull('parent_id');
+        } elseif (!$typeFilter || $typeFilter === 'task') {
+            // Mặc định: chỉ task gốc
             $query->whereNull('parent_id');
+            if ($typeFilter === 'task') $query->where('type', Task::TYPE_TASK);
+        } else {
+            $query->where('type', $typeFilter);
         }
 
         if (request()->filled('search'))      $query->where(fn($q) => $q->where('title', 'like', '%'.request('search').'%')->orWhere('code', 'like', '%'.request('search').'%'));
         if (request()->filled('status'))      $query->where('status', request('status'));
-        if ($typeFilter)                      $query->where('type', $typeFilter);
         if (request()->filled('assigned_to')) $query->where('assigned_to', request('assigned_to'));
         if (request()->filled('date_from'))   $query->whereDate('created_at', '>=', request('date_from'));
         if (request()->filled('date_to'))     $query->whereDate('created_at', '<=', request('date_to'));

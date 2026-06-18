@@ -65,9 +65,11 @@
         <label class="filter-label">Loại</label>
         <select name="type" class="filter-control {{ request('type') ? 'filter-active' : '' }}">
             <option value="">Tất cả</option>
-            @foreach (\App\Models\Task::TYPE_LABELS as $val => $label)
-                <option value="{{ $val }}" {{ request('type') === $val ? 'selected' : '' }}>{{ $label }}</option>
-            @endforeach
+            <option value="task"           {{ request('type') === 'task'           ? 'selected' : '' }}>Task</option>
+            <option value="bug"            {{ request('type') === 'bug'            ? 'selected' : '' }}>Bug (từ task)</option>
+            <option value="production_bug" {{ request('type') === 'production_bug' ? 'selected' : '' }}>Bug Production</option>
+            <option value="subtask"        {{ request('type') === 'subtask'        ? 'selected' : '' }}>Subtask</option>
+            <option value="test"           {{ request('type') === 'test'           ? 'selected' : '' }}>Test</option>
         </select>
     </div>
 
