@@ -12,7 +12,7 @@
 
 @section('content')
 <div class="page-header">
-    <h1>Tạo <span class="accent">Task</span></h1>
+    <h1>Tạo <span class="accent" id="pageTypeLabel">Task</span></h1>
     <p>Trong dự án <strong>{{ $project->name }}</strong></p>
 </div>
 
@@ -22,8 +22,27 @@
 
 <div class="card">
     <div class="card-header">
-        <span class="card-title">Thông tin Task</span>
+        <span class="card-title">Thông tin</span>
         <span class="status-pill status-todo" style="font-size:11px">To Do</span>
+    </div>
+
+    {{-- Type selector --}}
+    <div class="form-group">
+        <label class="form-label">Loại <span class="required">*</span></label>
+        <div class="type-selector">
+            @if(in_array($role, ['pm', 'admin']) || Auth::user()->isAdmin())
+            <label class="type-option" id="typeOptTask">
+                <input type="radio" name="type" value="task" {{ old('type', 'task') === 'task' ? 'checked' : '' }} onchange="onTypeChange('task')">
+                <span class="type-chip-xs type-task">Task</span>
+                <span class="type-opt-desc">Tính năng / công việc mới</span>
+            </label>
+            @endif
+            <label class="type-option" id="typeOptBug">
+                <input type="radio" name="type" value="bug" {{ old('type') === 'bug' ? 'checked' : '' }} onchange="onTypeChange('bug')">
+                <span class="type-chip-xs type-bug">Bug</span>
+                <span class="type-opt-desc">Lỗi phát sinh cần sửa</span>
+            </label>
+        </div>
     </div>
 
     <div class="form-group">
@@ -86,6 +105,35 @@
     </div>
 
     <div class="priority-preview" id="priorityPreview"></div>
+
+    {{-- Production Bug section (hiện khi type=bug, chỉ PM/Admin điền được) --}}
+    @if(in_array($role, ['pm', 'admin']) || Auth::user()->isAdmin())
+    <div id="prodBugSection" style="display:none;margin-top:4px;padding:14px;background:rgba(220,38,38,.04);border:1px solid rgba(220,38,38,.2);border-radius:6px">
+        <div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1L1 14h14L8 1zm-1 8V6h2v3H7zm0 2h2v2H7v-2z"/></svg>
+            Truy vết Production Bug
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="linked_task_id">Lỗi này phát sinh từ task nào trước đó?</label>
+            <input type="text" id="linkedTaskSearch" class="form-control"
+                   placeholder="Tìm theo mã hoặc tên task..."
+                   style="margin-bottom:6px"
+                   oninput="filterLinkedTasks(this.value)">
+            <select id="linked_task_id" name="linked_task_id" class="form-control" size="5" style="height:auto">
+                <option value="">— Không liên quan đến task cũ —</option>
+                @foreach($allTasks as $t)
+                <option value="{{ $t->id }}"
+                    {{ old('linked_task_id') == $t->id ? 'selected' : '' }}
+                    data-search="{{ strtolower($t->code . ' ' . $t->title) }}">
+                    @if($t->status === 'done')[✓ DONE]@else[{{ strtoupper($t->status) }}]@endif
+                    {{ $t->code }} — {{ Str::limit($t->title, 55) }}
+                </option>
+                @endforeach
+            </select>
+            <div style="font-size:11px;color:var(--text-3);margin-top:5px">Nếu chọn → hệ thống tự động trừ -5 KPI của Dev + Tester gốc của task đó.</div>
+        </div>
+    </div>
+    @endif
 </div>
 
 <div style="display:flex;gap:10px;margin-top:16px">
@@ -113,6 +161,17 @@
     .priority-preview.medium   { background:rgba(59,130,246,.08); color:var(--blue); }
     .priority-preview.high     { background:rgba(234,179,8,.08);  color:var(--yellow); }
     .priority-preview.critical { background:rgba(239,68,68,.08);  color:var(--red); }
+
+    .type-selector { display:flex; gap:10px; flex-wrap:wrap; }
+    .type-option {
+        display:flex; align-items:center; gap:8px;
+        padding:8px 14px; border:1px solid var(--border);
+        border-radius:6px; cursor:pointer; transition:all .15s;
+        background:var(--bg-1);
+    }
+    .type-option:has(input:checked) { border-color:var(--accent); background:var(--bg-3); }
+    .type-option input[type=radio] { display:none; }
+    .type-opt-desc { font-size:12px; color:var(--text-3); }
 </style>
 @endpush
 
@@ -133,5 +192,27 @@
     }
     document.getElementById('priority').addEventListener('change', updatePriorityPreview);
     updatePriorityPreview();
+
+    function onTypeChange(type) {
+        const label = document.getElementById('pageTypeLabel');
+        const prodSection = document.getElementById('prodBugSection');
+        const submitBtn = document.querySelector('button[type=submit]');
+        if (label) label.textContent = type === 'bug' ? 'Bug' : 'Task';
+        if (prodSection) prodSection.style.display = type === 'bug' ? 'block' : 'none';
+        if (submitBtn) submitBtn.textContent = type === 'bug' ? 'Tạo Bug' : 'Tạo Task';
+    }
+
+    function filterLinkedTasks(q) {
+        q = q.toLowerCase().trim();
+        document.querySelectorAll('#linked_task_id option').forEach(opt => {
+            opt.hidden = q !== '' && !opt.dataset.search?.includes(q);
+        });
+    }
+
+    // Init on load (for old() restoration)
+    document.addEventListener('DOMContentLoaded', () => {
+        const checked = document.querySelector('input[name=type]:checked');
+        if (checked) onTypeChange(checked.value);
+    });
 </script>
 @endpush

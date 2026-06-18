@@ -304,8 +304,10 @@
     {{-- ── Production Bug warning ─────────────────────────────────────────── --}}
     @if ($task->is_production_bug && $task->linkedStory)
     @php
-        $origDev    = $task->linkedStory->histories->where('to_status', 'ready_to_test')->first()?->actor;
-        $origTester = $task->linkedStory->histories->whereIn('to_status', ['review_approved', 'done'])->first()?->actor;
+        $origDev    = $task->linkedStory->histories->where('to_status', 'ready_to_test')->last()?->actor;
+        $origTester = $task->linkedStory->histories->whereIn('to_status', ['review_approved', 'done'])->last()?->actor;
+        $doneEntry  = $task->linkedStory->histories->where('to_status', 'done')->last();
+        $doneDate   = $doneEntry?->created_at;
     @endphp
     <div class="alert alert-danger" style="margin-bottom:16px;display:flex;gap:12px;align-items:flex-start">
         <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0;margin-top:1px">
@@ -314,7 +316,7 @@
         <div>
             <strong>Production Bug — Lỗi lọt lưới từ tính năng đã nghiệm thu</strong>
             <div style="margin-top:6px;font-size:13px">
-                Tính năng gốc:
+                Task gốc:
                 <a href="{{ route('projects.tasks.show', [$project, $task->linkedStory]) }}"
                    style="color:inherit;font-family:var(--font-mono)">{{ $task->linkedStory->code }}</a>
                 — {{ $task->linkedStory->title }}
@@ -331,6 +333,9 @@
                         <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z"/></svg>
                         Tester: <strong>{{ $origTester->full_name }}</strong>
                     </span>
+                @endif
+                @if($doneDate)
+                    <span>Done ngày: <strong>{{ $doneDate->format('d/m/Y') }}</strong></span>
                 @endif
                 <span style="color:var(--text-3)">KPI đã bị trừ -5 điểm mỗi người</span>
             </div>
@@ -432,6 +437,12 @@
         <button class="tab-btn" onclick="switchTab('history', this)">
             Lịch sử
             <span class="tab-count">{{ $historyCount }}</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('comments', this)">
+            Bình luận
+            @if($task->comments->count() > 0)
+            <span class="tab-count">{{ $task->comments->count() }}</span>
+            @endif
         </button>
     </div>
 
@@ -640,11 +651,156 @@
         @endforelse
     </div>
 
+    {{-- ════════════════════════════════════════════════════════════════════ --}}
+    {{-- COMMENTS tab                                                         --}}
+    {{-- ════════════════════════════════════════════════════════════════════ --}}
+    <div id="tab-comments" class="tab-panel card" style="display:none">
+
+        {{-- Danh sách comment --}}
+        <div id="commentList">
+        @forelse ($task->comments as $c)
+            <div class="comment-item" id="comment-{{ $c->id }}">
+                <div class="comment-avatar">
+                    <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-.3-5 5-5 5 5 5 5H3z"/></svg>
+                </div>
+                <div class="comment-body">
+                    <div class="comment-meta">
+                        <strong>{{ $c->user->full_name }}</strong>
+                        <span class="comment-time">{{ $c->created_at->format('d/m/Y H:i') }}</span>
+                        @if(Auth::id() === $c->user_id || Auth::user()->isAdmin())
+                        <form method="POST" action="{{ route('projects.tasks.comments.destroy', [$project, $task, $c]) }}" style="margin-left:auto">
+                            @csrf @method('DELETE')
+                            <button type="submit" class="btn-del-comment" onclick="return confirm('Xoá bình luận này?')"
+                                    title="Xoá">
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M6 2h4v1H6V2zm-2 2h8l-1 10H5L4 4zm3 2v6H6V6h1zm3 0v6h-1V6h1z"/></svg>
+                            </button>
+                        </form>
+                        @endif
+                    </div>
+                    <div class="comment-content ql-editor" style="padding:0">
+                        {!! $c->content !!}
+                    </div>
+                    @if($c->attachments->isNotEmpty())
+                    <div class="comment-attachments">
+                        @foreach($c->attachments as $att)
+                            @php $isImage = str_starts_with($att->mime_type ?? '', 'image/'); @endphp
+                            @if($isImage)
+                                <a href="{{ $att->url() }}" target="_blank" class="att-img-wrap">
+                                    <img src="{{ $att->url() }}" alt="{{ $att->original_name }}" class="att-img-preview">
+                                </a>
+                            @else
+                                <a href="{{ $att->url() }}" target="_blank" class="att-file">
+                                    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h6l4 4v10H4V1zm6 0v4h4"/></svg>
+                                    {{ $att->original_name }}
+                                    <span class="att-size">{{ $att->formattedSize() }}</span>
+                                </a>
+                            @endif
+                        @endforeach
+                    </div>
+                    @endif
+                </div>
+            </div>
+        @empty
+            <div style="padding:32px;text-align:center;color:var(--text-3);font-size:13px">
+                Chưa có bình luận nào. Hãy là người đầu tiên!
+            </div>
+        @endforelse
+        </div>
+
+        {{-- Form thêm comment --}}
+        <div class="comment-form-wrap">
+            @if($errors->has('content'))
+                <div class="alert alert-danger" style="margin-bottom:8px">{{ $errors->first('content') }}</div>
+            @endif
+            <form id="commentForm" method="POST"
+                  action="{{ route('projects.tasks.comments.store', [$project, $task]) }}"
+                  enctype="multipart/form-data">
+                @csrf
+                <div id="quillEditor" style="min-height:120px"></div>
+                <input type="hidden" name="content" id="commentContent">
+
+                {{-- File attachments --}}
+                <div class="comment-attach-row">
+                    <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 3A2.5 2.5 0 0 1 7 .5h5A2.5 2.5 0 0 1 14.5 3v7a4.5 4.5 0 0 1-9 0V5a.5.5 0 0 1 1 0v5a3.5 3.5 0 0 0 7 0V3A1.5 1.5 0 0 0 12 1.5H7A1.5 1.5 0 0 0 5.5 3v7a.5.5 0 0 1-1 0V3z"/></svg>
+                        Đính kèm file
+                        <input type="file" name="attachments[]" id="attachmentInput" multiple
+                               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.zip,.txt"
+                               style="display:none" onchange="showFileList(this)">
+                    </label>
+                    <div id="fileList" style="font-size:12px;color:var(--text-3);display:flex;gap:6px;flex-wrap:wrap"></div>
+                    <button type="submit" class="btn btn-primary btn-sm" style="margin-left:auto"
+                            onclick="syncContent()">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M1 8l6-6 1.5 1.5L4 8l4.5 4.5L7 14 1 8zm8 0l6-6 1.5 1.5L12 8l4.5 4.5L15 14 9 8z" style="display:none"/><path d="M2 13.5L13.5 2l1 1L3 14.5l-1-1z"/><path d="M13.5 2l1 1-4 4-1-1 4-4z"/><path d="M2 13.5l1 1 4-4-1-1-4 4z"/></svg>
+                        Gửi bình luận
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
 @endsection
 
 @push('styles')
+<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
 <style>
+    /* Quill theme override */
+    .ql-toolbar.ql-snow { border-color: var(--border); border-radius: 6px 6px 0 0; background: var(--bg-2); }
+    .ql-container.ql-snow { border-color: var(--border); border-radius: 0 0 6px 6px; background: var(--bg-1); }
+    .ql-editor { min-height: 120px; font-size: 14px; color: var(--text-1); }
+    .ql-editor img { max-width: 100%; border-radius: 4px; margin: 4px 0; }
+
+    /* Comment list */
+    .comment-item {
+        display: flex; gap: 12px; padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+    }
+    .comment-item:last-child { border-bottom: none; }
+    .comment-avatar {
+        width: 30px; height: 30px; flex-shrink: 0;
+        background: var(--bg-3); border-radius: 50%;
+        display: grid; place-items: center; color: var(--accent);
+        border: 1px solid var(--border-lit);
+    }
+    .comment-body { flex: 1; min-width: 0; }
+    .comment-meta {
+        display: flex; align-items: center; gap: 8px;
+        margin-bottom: 6px; font-size: 13px;
+    }
+    .comment-time { font-size: 11px; color: var(--text-3); }
+    .btn-del-comment {
+        background: none; border: none; cursor: pointer;
+        color: var(--text-3); padding: 2px 4px; border-radius: 3px;
+    }
+    .btn-del-comment:hover { color: var(--red); background: rgba(239,68,68,.08); }
+    .comment-content { font-size: 13px; line-height: 1.6; }
+    .comment-content p { margin: 0 0 6px; }
+
+    /* Attachments */
+    .comment-attachments { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .att-img-wrap { display: inline-block; }
+    .att-img-preview { max-width: 180px; max-height: 120px; border-radius: 4px; border: 1px solid var(--border); cursor: zoom-in; }
+    .att-file {
+        display: inline-flex; align-items: center; gap: 5px;
+        font-size: 12px; color: var(--accent); text-decoration: none;
+        background: var(--bg-3); border: 1px solid var(--border);
+        border-radius: 4px; padding: 4px 8px;
+    }
+    .att-file:hover { background: var(--bg-2); }
+    .att-size { color: var(--text-3); font-size: 11px; }
+
+    /* Comment form */
+    .comment-form-wrap {
+        padding: 16px;
+        border-top: 1px solid var(--border);
+        background: var(--bg-2);
+        border-radius: 0 0 8px 8px;
+    }
+    .comment-attach-row {
+        display: flex; align-items: center; gap: 8px;
+        margin-top: 10px; flex-wrap: wrap;
+    }
+
     /* Progress bar */
     .task-info-row {
         display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -869,7 +1025,74 @@
 @endpush
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
 <script>
+    // ── Quill rich-text editor for comments ──────────────────────────────
+    let quill;
+    document.addEventListener('DOMContentLoaded', function () {
+        const editorEl = document.getElementById('quillEditor');
+        if (!editorEl) return;
+
+        quill = new Quill('#quillEditor', {
+            theme: 'snow',
+            placeholder: 'Viết bình luận, mô tả lỗi, đính kèm ảnh...',
+            modules: {
+                toolbar: {
+                    container: [
+                        [{ header: [2, 3, false] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ color: [] }],
+                        [{ list: 'ordered' }, { list: 'bullet' }],
+                        ['blockquote', 'code-block'],
+                        ['link', 'image'],
+                        ['clean'],
+                    ],
+                    handlers: {
+                        image: imageUploadHandler,
+                    },
+                },
+            },
+        });
+    });
+
+    function imageUploadHandler() {
+        const input = document.createElement('input');
+        input.setAttribute('type', 'file');
+        input.setAttribute('accept', 'image/*');
+        input.click();
+        input.onchange = async () => {
+            const file = input.files[0];
+            if (!file) return;
+            const form = new FormData();
+            form.append('image', file);
+            form.append('_token', '{{ csrf_token() }}');
+            try {
+                const res = await fetch('{{ route('projects.tasks.comments.upload-image', [$project, $task]) }}', {
+                    method: 'POST', body: form,
+                });
+                const data = await res.json();
+                const range = quill.getSelection(true);
+                quill.insertEmbed(range.index, 'image', data.url);
+                quill.setSelection(range.index + 1);
+            } catch (e) {
+                alert('Upload ảnh thất bại. Vui lòng thử lại.');
+            }
+        };
+    }
+
+    function syncContent() {
+        const input = document.getElementById('commentContent');
+        if (quill && input) input.value = quill.root.innerHTML;
+        return true;
+    }
+
+    function showFileList(input) {
+        const list = document.getElementById('fileList');
+        list.innerHTML = Array.from(input.files).map(f =>
+            `<span style="background:var(--bg-3);border:1px solid var(--border);border-radius:3px;padding:2px 6px">${f.name}</span>`
+        ).join('');
+    }
+
     function onStatusChange(val) {
         const tf = document.getElementById('testerField');
         const ts = document.getElementById('testerSelect');

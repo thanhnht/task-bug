@@ -47,14 +47,28 @@ class TaskController extends Controller
     // ── Tạo task chính ────────────────────────────────────────────────────
     public function create(Project $project)
     {
-        $this->mustHaveRole($project, [Project::ROLE_PM]);
+        $this->mustBeMember($project);
+        /** @var User $user */
+        $user    = Auth::user();
+        $role    = $project->roleOf($user);
         $members = $project->members()->orderBy('full_name')->get();
-        return view('tasks.create', compact('project', 'members'));
+        $allTasks = $project->tasks()->orderBy('code')->get(['id', 'code', 'title', 'type', 'status', 'parent_id']);
+        return view('tasks.create', compact('project', 'members', 'role', 'allTasks'));
     }
 
     public function store(Request $request, Project $project)
     {
-        $this->mustHaveRole($project, [Project::ROLE_PM]);
+        $this->mustBeMember($project);
+        /** @var User $user */
+        $user = Auth::user();
+        $role = $project->roleOf($user);
+
+        $type = $request->input('type', Task::TYPE_TASK);
+
+        // Task thường chỉ PM tạo được; bug thì ai cũng tạo được
+        if ($type !== Task::TYPE_BUG && $role !== Project::ROLE_PM && !$user->isAdmin()) {
+            abort(403, 'Chỉ PM mới có thể tạo task thường.');
+        }
 
         $data = $request->validate([
             'title'           => 'required|string|max:200',
@@ -63,23 +77,29 @@ class TaskController extends Controller
             'start_date'      => 'nullable|date',
             'due_date'        => 'nullable|date|after_or_equal:start_date',
             'estimated_hours' => 'nullable|numeric|min:0.5|max:999',
-            'assigned_to'     => [
-                'nullable', 'exists:users,id',
-                function ($_attr, $value, $fail) use ($project) {
-                    if ($value && !$project->isDeveloper(User::find($value))) {
-                        $fail('Người được giao phải là Developer của dự án.');
-                    }
-                },
-            ],
+            'assigned_to'     => ['nullable', 'exists:users,id'],
+            'linked_task_id'  => ['nullable', 'exists:tasks,id'],
         ]);
 
+        $linkedTaskId   = $data['linked_task_id'] ?? null;
+        $isProductionBug = $type === Task::TYPE_BUG && $linkedTaskId
+                           && ($role === Project::ROLE_PM || $user->isAdmin());
+
         $task = $project->tasks()->create([
-            ...$data,
-            'code'       => Task::nextCode(),
-            'type'       => Task::TYPE_TASK,
-            'parent_id'  => null,
-            'status'     => Task::STATUS_TODO,
-            'created_by' => Auth::id(),
+            'title'            => $data['title'],
+            'description'      => $data['description'] ?? null,
+            'priority'         => $data['priority'],
+            'start_date'       => $data['start_date'] ?? null,
+            'due_date'         => $data['due_date'] ?? null,
+            'estimated_hours'  => $data['estimated_hours'] ?? null,
+            'assigned_to'      => $data['assigned_to'] ?? null,
+            'code'             => Task::nextCode(),
+            'type'             => $type,
+            'parent_id'        => null,
+            'status'           => Task::STATUS_TODO,
+            'created_by'       => Auth::id(),
+            'is_production_bug' => $isProductionBug,
+            'linked_story_id'  => $isProductionBug ? $linkedTaskId : null,
         ]);
 
         $task->histories()->create([
@@ -88,6 +108,10 @@ class TaskController extends Controller
             'note'        => 'Task được tạo',
             'changed_by'  => Auth::id(),
         ]);
+
+        if ($isProductionBug) {
+            KpiService::deductForProductionBug($task);
+        }
 
         if ($task->assigned_to) {
             $this->notifyAssigned($task, $project, $task->assigned_to);
@@ -109,6 +133,7 @@ class TaskController extends Controller
             'children.assignee', 'children.creator',
             'histories.actor',
             'linkedStory.histories.actor',
+            'comments.user', 'comments.attachments',
         ]);
 
         $role       = $project->roleOf(Auth::user());

@@ -89,6 +89,9 @@ Route::middleware(['auth', 'account.active'])->group(function () {
                         Route::post('/children',                         [TaskController::class, 'storeChild'])->name('children.store');
                         Route::post('/children/{child}/transition',      [TaskController::class, 'transitionChild'])->name('children.transition');
                         Route::post('/report-bug',                       [TaskController::class, 'reportBug'])->name('report-bug');
+                        Route::post('/comments',                         [\App\Http\Controllers\CommentController::class, 'store'])->name('comments.store');
+                        Route::post('/comments/upload-image',            [\App\Http\Controllers\CommentController::class, 'uploadImage'])->name('comments.upload-image');
+                        Route::delete('/comments/{comment}',             [\App\Http\Controllers\CommentController::class, 'destroy'])->name('comments.destroy');
                     });
                 });
             });

@@ -82,6 +82,7 @@ class Task extends Model
     public function histories(): HasMany      { return $this->hasMany(TaskHistory::class)->orderByDesc('created_at'); }
     public function linkedStory(): BelongsTo  { return $this->belongsTo(Task::class, 'linked_story_id'); }
     public function productionBugs(): HasMany { return $this->hasMany(Task::class, 'linked_story_id')->where('is_production_bug', true); }
+    public function comments(): HasMany       { return $this->hasMany(\App\Models\Comment::class)->orderBy('created_at'); }
 
     // ── Hierarchy helpers ──────────────────────────────────────────────────
     public function isMainTask(): bool  { return $this->parent_id === null; }
