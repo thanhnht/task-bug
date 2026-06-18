@@ -181,7 +181,7 @@ class KpiService
     }
 
     /** Developer = người cuối cùng chuyển task sang RTT (hoặc assigned_to). */
-    private static function findDevId(Task $task): ?int
+    public static function findDevId(Task $task): ?int
     {
         $id = TaskHistory::where('task_id', $task->id)
             ->where('to_status', Task::STATUS_READY_TO_TEST)

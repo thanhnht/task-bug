@@ -291,7 +291,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         list.innerHTML = members.map((m, i) => `
             <div class="member-item">
                 <div class="member-avatar" style="color:var(${m.role === 'pm' ? '--accent' : m.role === 'developer' ? '--blue' : '--green'})">
-                    ${m.name.slice(0,2).toUpperCase()}
+                    <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-.3-5 5-5 5 5 5 5H3z"/></svg>
                 </div>
                 <div class="member-name">${m.name}</div>
                 <span class="member-role ${ROLE_COLORS[m.role]}">${ROLE_LABELS[m.role]}</span>

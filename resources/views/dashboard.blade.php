@@ -209,9 +209,44 @@
 </div>
 @endif
 
-{{-- ── KPI Team (chỉ PM / Admin) ───────────────────────────────────────────── --}}
+{{-- ── KPI Section ──────────────────────────────────────────────────────────── --}}
+@php
+    $kpiMonthLabel = \Carbon\Carbon::createFromFormat('Y-m', $currentMonth)->format('m/Y');
+    $pmProjects = $projects->filter(fn($p) => $p->roleOf($user) === 'pm' || $user->isAdmin());
+@endphp
+
+{{-- Project selector (chỉ hiện nếu tham gia nhiều hơn 1 project) --}}
+@if ($projects->count() > 1)
+<div class="kpi-project-filter">
+    <form method="GET" action="{{ route('employee.dashboard') }}" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:13px;color:var(--text-2);font-weight:500">KPI theo dự án:</span>
+        <select name="kpi_project" class="form-control" style="width:220px;font-size:13px"
+                onchange="this.form.submit()">
+            <option value="">— Tất cả dự án —</option>
+            @foreach ($projects as $p)
+            <option value="{{ $p->id }}" {{ $kpiProject?->id == $p->id ? 'selected' : '' }}>
+                [{{ $p->code }}] {{ $p->name }}
+            </option>
+            @endforeach
+        </select>
+        @if ($kpiProject)
+        @php $myRoleLabel = match($roleInKpiProject) { 'pm'=>'PM', 'developer'=>'Developer', 'tester'=>'Tester', 'admin'=>'Admin', default=>'Thành viên' }; @endphp
+        <span class="role-tag role-{{ $roleInKpiProject === 'admin' ? 'pm' : $roleInKpiProject }}"
+              style="font-size:11px">
+            Vai trò của bạn: {{ $myRoleLabel }}
+        </span>
+        <a href="{{ route('employee.dashboard') }}" class="btn btn-ghost btn-sm" style="font-size:12px">✕ Bỏ lọc</a>
+        @endif
+    </form>
+</div>
+@endif
+
+{{-- KPI Team (PM/Admin trong project được chọn) --}}
 @if ($isPmOrAdmin && $teamKpiData->isNotEmpty())
-<div class="dash-section-title" style="margin-top:8px">Cảnh báo KPI Team — tháng {{ \Carbon\Carbon::createFromFormat('Y-m', $currentMonth)->format('m/Y') }}</div>
+<div class="dash-section-title" style="margin-top:8px">
+    Cảnh báo KPI Team — tháng {{ $kpiMonthLabel }}
+    @if ($kpiProject) <span style="font-weight:400;font-size:12px;color:var(--text-3)"> · {{ $kpiProject->name }}</span> @endif
+</div>
 <div class="card" style="margin-bottom:20px">
     <table class="dash-table">
         <thead>
@@ -263,6 +298,14 @@
             @endforeach
         </tbody>
     </table>
+</div>
+@elseif ($kpiProject && !$isPmOrAdmin)
+{{-- Dev/Tester đã chọn project nhưng không phải PM → chỉ thấy KPI cá nhân --}}
+<div class="auto-status-info" style="margin-bottom:16px;background:rgba(37,99,235,.06);border-color:var(--border-lit);color:var(--text-2)">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.75 3.5h1.5v5h-1.5v-5zm0 6.5h1.5v1.5h-1.5V11z"/>
+    </svg>
+    Bạn là <strong>{{ $myRoleLabel ?? 'thành viên' }}</strong> trong dự án này — chỉ xem được KPI cá nhân.
 </div>
 @endif
 
@@ -394,5 +437,14 @@
     @media (max-width: 1100px) { .dash-grid-4 { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 900px)  { .dash-layout { grid-template-columns: 1fr; } .dash-grid-3 { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 600px)  { .dash-grid-4, .dash-grid-3 { grid-template-columns: 1fr 1fr; } }
+
+    .kpi-project-filter {
+        background: var(--bg-1);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        margin-top: 8px;
+    }
 </style>
 @endpush

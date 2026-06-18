@@ -112,14 +112,27 @@ class DashboardController extends Controller
         $myKpiScore        = KpiService::scoreForMonth($user->id, $currentMonth);
         $myKpiTransactions = KpiService::transactionsForMonth($user->id, $currentMonth);
 
-        // PM/Admin thấy điểm KPI của toàn team
-        $isPmOrAdmin = $user->isAdmin() || DB::table('project_members')
-            ->where('user_id', $user->id)->where('role', 'pm')->exists();
+        // Project filter cho KPI section
+        $kpiProjectId  = request('kpi_project');
+        $kpiProject    = $kpiProjectId ? $projects->firstWhere('id', (int)$kpiProjectId) : null;
+        $kpiProjectIds = $kpiProject ? collect([$kpiProject->id]) : $projectIds;
+
+        // Role của user trong project được chọn (hoặc null nếu chưa chọn)
+        $roleInKpiProject = $kpiProject ? $kpiProject->roleOf($user) : null;
+
+        // isPmOrAdmin: nếu đã chọn project → check role trong project đó
+        //              nếu chưa chọn → check toàn bộ (behavior cũ)
+        if ($kpiProject) {
+            $isPmOrAdmin = $user->isAdmin() || $roleInKpiProject === 'pm' || $roleInKpiProject === 'admin';
+        } else {
+            $isPmOrAdmin = $user->isAdmin() || DB::table('project_members')
+                ->where('user_id', $user->id)->where('role', 'pm')->exists();
+        }
 
         $teamKpiData = collect();
         if ($isPmOrAdmin) {
             $memberIds = DB::table('project_members')
-                ->whereIn('project_id', $projectIds)
+                ->whereIn('project_id', $kpiProjectIds)
                 ->where('user_id', '!=', $user->id)
                 ->pluck('user_id')
                 ->unique()
@@ -134,7 +147,7 @@ class DashboardController extends Controller
                         'score' => $scores[$u->id] ?? KpiService::BASE_SCORE,
                         'role'  => DB::table('project_members')
                             ->where('user_id', $u->id)
-                            ->whereIn('project_id', $projectIds)
+                            ->whereIn('project_id', $kpiProjectIds)
                             ->value('role'),
                     ])
                     ->sortBy('score');
@@ -145,7 +158,8 @@ class DashboardController extends Controller
             'user', 'myTasks', 'projects',
             'bugStats', 'retestCount', 'rejectFromDone',
             'qualityByProject', 'bugPerformance', 'recentActivity',
-            'myKpiScore', 'myKpiTransactions', 'isPmOrAdmin', 'teamKpiData', 'currentMonth'
+            'myKpiScore', 'myKpiTransactions', 'isPmOrAdmin', 'teamKpiData', 'currentMonth',
+            'kpiProject', 'roleInKpiProject'
         ));
     }
 }

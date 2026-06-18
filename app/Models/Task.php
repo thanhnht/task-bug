@@ -148,6 +148,13 @@ class Task extends Model
             if (!$actor->isAdmin() && $role !== 'tester') {
                 return ['ok' => false, 'message' => 'Chỉ Tester mới có thể phê duyệt Review Approved.'];
             }
+            $openBugs = $this->children()
+                ->where('type', self::TYPE_BUG)
+                ->where('status', '!=', self::STATUS_DONE)
+                ->count();
+            if ($openBugs > 0) {
+                return ['ok' => false, 'message' => "Còn {$openBugs} bug chưa đóng. Phải đóng hết bug trước khi Approved."];
+            }
         }
 
         if ($newStatus === self::STATUS_DONE) {

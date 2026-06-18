@@ -88,6 +88,7 @@ Route::middleware(['auth', 'account.active'])->group(function () {
                         // Task con (bất kỳ thành viên tạo)
                         Route::post('/children',                         [TaskController::class, 'storeChild'])->name('children.store');
                         Route::post('/children/{child}/transition',      [TaskController::class, 'transitionChild'])->name('children.transition');
+                        Route::post('/report-bug',                       [TaskController::class, 'reportBug'])->name('report-bug');
                     });
                 });
             });

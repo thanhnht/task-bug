@@ -125,7 +125,14 @@ class TaskController extends Controller
             ->orderBy('code')
             ->get(['id', 'code', 'title']);
 
-        return view('tasks.show', compact('project', 'task', 'role', 'members', 'testers', 'allMembers', 'transitions', 'doneStories'));
+        // Dev gốc cho modal Fail (Pass/Fail UX)
+        $devUser = null;
+        $devId = KpiService::findDevId($task);
+        if ($devId) {
+            $devUser = User::find($devId, ['id', 'full_name']);
+        }
+
+        return view('tasks.show', compact('project', 'task', 'role', 'members', 'testers', 'allMembers', 'transitions', 'doneStories', 'devUser'));
     }
 
     // ── Cập nhật task chính ───────────────────────────────────────────────
@@ -391,6 +398,56 @@ class TaskController extends Controller
         }
 
         return back()->with('success', $result['message']);
+    }
+
+    // ── Báo lỗi từ Ready to Test ──────────────────────────────────────────
+    public function reportBug(Request $request, Project $project, Task $task)
+    {
+        $this->mustBeMember($project);
+        abort_if($task->project_id !== $project->id, 404);
+
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if (!$project->isTester($user) && !$user->isAdmin()) {
+            abort(403);
+        }
+
+        if ($task->status !== Task::STATUS_READY_TO_TEST) {
+            return back()->withErrors(['report_error' => 'Task phải ở trạng thái Ready to Test.']);
+        }
+
+        $request->validate([
+            'title'       => 'required|string|max:255',
+            'description' => 'nullable|string',
+        ]);
+
+        $slaDays = match($task->priority) {
+            'critical' => 0,
+            'high'     => 1,
+            default    => 2,
+        };
+
+        $bug = Task::create([
+            'code'        => Task::nextCode(),
+            'project_id'  => $task->project_id,
+            'parent_id'   => $task->id,
+            'type'        => Task::TYPE_BUG,
+            'title'       => $request->input('title'),
+            'description' => $request->input('description'),
+            'priority'    => $task->priority,
+            'status'      => Task::STATUS_TODO,
+            'assigned_to' => KpiService::findDevId($task),
+            'created_by'  => $user->id,
+            'due_date'    => now()->addDays($slaDays)->toDateString(),
+        ]);
+
+        $task->transitionTo(Task::STATUS_IN_PROGRESS, $user, 'Tester báo lỗi: ' . $bug->code);
+
+        KpiService::deductForBugCreated($task);
+
+        return redirect()->route('projects.tasks.show', [$project, $task])
+            ->with('success', 'Đã tạo ' . $bug->code . ' và gán cho developer.');
     }
 
     // ── Notification helpers ──────────────────────────────────────────────

@@ -186,6 +186,10 @@
                                 onchange="onStatusChange(this.value)">
                             @foreach (\App\Models\Task::STATUS_LABELS as $val => $label)
                                 @if ($val !== $task->status)
+                                    {{-- Tester dùng nút Pass thay cho review_approved trong dropdown --}}
+                                    @if ($val === 'review_approved' && $role === 'tester' && $task->status === 'ready_to_test')
+                                        @continue
+                                    @endif
                                     @if ($val === 'review_approved' && $role !== 'tester' && !Auth::user()->isAdmin())
                                         @continue
                                     @endif
@@ -226,6 +230,74 @@
             @error('transition')
                 <div class="alert alert-danger" style="margin-top:8px">{{ $message }}</div>
             @enderror
+
+            {{-- ── Pass / Fail (Tester / Admin, khi task đang ở RTT) ────────── --}}
+            @if ($task->status === 'ready_to_test' && ($role === 'tester' || Auth::user()->isAdmin()))
+            <div class="pass-fail-bar">
+                {{-- Pass --}}
+                <form method="POST" action="{{ route('projects.tasks.transition', [$project, $task]) }}">
+                    @csrf
+                    <input type="hidden" name="status" value="review_approved">
+                    <button type="submit" class="btn btn-success">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm3.5 5.5-4 4-2-2 1-1 1 1 3-3 1 1z"/></svg>
+                        Pass — Đạt yêu cầu
+                    </button>
+                </form>
+
+                {{-- Fail --}}
+                <button type="button" id="btnFail" class="btn btn-danger">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-1 4h2v5H7V5zm0 6h2v2H7v-2z"/></svg>
+                    Fail — Có lỗi
+                </button>
+            </div>
+
+            @error('report_error')
+                <div class="alert alert-danger" style="margin-top:8px">{{ $message }}</div>
+            @enderror
+
+            {{-- Modal Fail --}}
+            <div id="modalFailBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
+                <div class="modal-fail-card">
+                    <div class="modal-fail-header">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="color:var(--red)"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-1 4h2v5H7V5zm0 6h2v2H7v-2z"/></svg>
+                        <span>Ghi nhận Bug mới</span>
+                    </div>
+
+                    <div class="modal-fail-info">
+                        <div>
+                            <span class="mf-label">Story</span>
+                            <strong>{{ $task->code }} — {{ $task->title }}</strong>
+                        </div>
+                        <div>
+                            <span class="mf-label">Developer</span>
+                            <strong>{{ $devUser?->full_name ?? '(Chưa xác định)' }}</strong>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="{{ route('projects.tasks.report-bug', [$project, $task]) }}">
+                        @csrf
+                        <div style="margin-bottom:10px">
+                            <label class="tbar-label">Tên bug <span style="color:var(--red)">*</span></label>
+                            <input type="text" name="title" class="form-control"
+                                   placeholder="Mô tả lỗi ngắn gọn..." required
+                                   value="{{ old('title') }}">
+                        </div>
+                        <div style="margin-bottom:14px">
+                            <label class="tbar-label">Mô tả chi tiết (tuỳ chọn)</label>
+                            <textarea name="description" class="form-control" rows="3"
+                                      placeholder="Steps to reproduce, expected vs actual...">{{ old('description') }}</textarea>
+                        </div>
+                        <div style="display:flex;gap:8px;justify-content:flex-end">
+                            <button type="button" id="btnCloseModal" class="btn btn-ghost btn-sm">Huỷ</button>
+                            <button type="submit" class="btn btn-danger btn-sm">
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>
+                                Tạo Bug
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            @endif
         @endif
     </div>
 
@@ -473,12 +545,13 @@
         </div>
 
         @forelse ($task->children as $child)
-            <div class="child-row type-border-{{ $child->type }} {{ $child->due_date && $child->due_date->isPast() && $child->status !== 'done' ? 'child-row--overdue' : '' }}">
+            <div class="child-row type-border-{{ $child->type }} {{ $child->due_date && $child->due_date->isPast() && $child->status !== 'done' ? 'child-row--overdue' : '' }}"
+                 onclick="window.location='{{ route('projects.tasks.show', [$project, $child]) }}'"
+                 style="cursor:pointer">
                 <div class="child-left">
                     <span class="type-chip-sm type-{{ $child->type }}">{{ $child->typeLabel() }}</span>
                     <span class="child-code">{{ $child->code }}</span>
-                    <a href="{{ route('projects.tasks.show', [$project, $child]) }}"
-                       class="child-title {{ $child->status === 'done' ? 'done-text' : '' }}">{{ $child->title }}</a>
+                    <span class="child-title {{ $child->status === 'done' ? 'done-text' : '' }}">{{ $child->title }}</span>
                     @if ($child->assignee)
                         <span class="child-assignee">{{ $child->assignee->full_name }}</span>
                     @endif
@@ -680,6 +753,55 @@
     .transition-bar { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
     .tbar-label { font-size:11px; color:var(--text-3); display:block; margin-bottom:4px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.06em; }
 
+    .pass-fail-bar {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+        flex-wrap: wrap;
+    }
+    .pass-fail-bar .btn { font-size: 14px; padding: 8px 18px; gap: 6px; }
+
+    .modal-fail-card {
+        background: var(--bg-1);
+        border: 1px solid var(--border-lit);
+        border-radius: 10px;
+        padding: 24px;
+        width: 480px;
+        max-width: calc(100vw - 32px);
+        box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    }
+    .modal-fail-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        color: var(--text-1);
+    }
+    .modal-fail-info {
+        background: var(--bg-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 12px 14px;
+        margin-bottom: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--text-2);
+    }
+    .mf-label {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: var(--text-3);
+        margin-right: 6px;
+    }
+
     .auto-status-info {
         display:flex; align-items:center; gap:8px; padding:9px 14px;
         border-radius:6px; font-size:12.5px; margin-top:12px;
@@ -760,6 +882,21 @@
     document.addEventListener('DOMContentLoaded', function () {
         const sel = document.getElementById('statusSelect');
         if (sel) onStatusChange(sel.value);
+
+        const btnFail    = document.getElementById('btnFail');
+        const backdrop   = document.getElementById('modalFailBackdrop');
+        const btnClose   = document.getElementById('btnCloseModal');
+        if (btnFail && backdrop) {
+            btnFail.addEventListener('click', () => {
+                backdrop.style.display = 'flex';
+            });
+            btnClose.addEventListener('click', () => {
+                backdrop.style.display = 'none';
+            });
+            backdrop.addEventListener('click', (e) => {
+                if (e.target === backdrop) backdrop.style.display = 'none';
+            });
+        }
     });
 
     function switchTab(name, btn) {

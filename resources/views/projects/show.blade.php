@@ -205,7 +205,7 @@
             @foreach($group as $member)
             <div class="member-row">
                 <div class="member-avatar-sm" style="color:var(--{{ $color }})">
-                    {{ strtoupper(substr($member->full_name, 0, 2)) }}
+                    <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-.3-5 5-5 5 5 5 5H3z"/></svg>
                 </div>
                 <div class="member-info">
                     <div class="member-name">{{ $member->full_name }}</div>

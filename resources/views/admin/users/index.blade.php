@@ -80,8 +80,8 @@
                     </td>
                     <td>
                         <div style="display:flex;align-items:center;gap:10px">
-                            <div style="width:30px;height:30px;background:var(--bg-3);border:1px solid var(--border-lit);border-radius:50%;display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--blue);flex-shrink:0">
-                                {{ strtoupper(substr($user->full_name, 0, 2)) }}
+                            <div style="width:30px;height:30px;background:var(--bg-3);border:1px solid var(--border-lit);border-radius:50%;display:grid;place-items:center;color:var(--blue);flex-shrink:0">
+                                <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-.3-5 5-5 5 5 5 5H3z"/></svg>
                             </div>
                             <span style="font-weight:500">{{ $user->full_name }}</span>
                         </div>

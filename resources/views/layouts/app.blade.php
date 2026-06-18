@@ -976,6 +976,40 @@
     </style>
 
     @stack('styles')
+
+    {{-- Flatpickr datepicker --}}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        /* Override Flatpickr to match app theme */
+        .flatpickr-calendar {
+            font-family: 'Inter', sans-serif;
+            border: 1px solid var(--border-lit);
+            box-shadow: 0 4px 16px rgba(37,99,235,.1);
+            border-radius: 10px;
+        }
+        .flatpickr-day.selected,
+        .flatpickr-day.selected:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+        .flatpickr-day:hover {
+            background: var(--bg-3);
+        }
+        .flatpickr-months .flatpickr-month,
+        .flatpickr-weekdays,
+        span.flatpickr-weekday {
+            background: var(--accent);
+            color: #fff;
+        }
+        .flatpickr-current-month .numInputWrapper span.arrowUp:after {
+            border-bottom-color: #fff;
+        }
+        .flatpickr-current-month .numInputWrapper span.arrowDown:after {
+            border-top-color: #fff;
+        }
+        .flatpickr-day.today { border-color: var(--accent); }
+        .flatpickr-day.today:hover { background: var(--bg-3); color: var(--accent); }
+    </style>
 </head>
 
 <body>
@@ -1048,7 +1082,7 @@
             {{-- User card at bottom --}}
             <div class="sidebar-user">
                 <div class="user-avatar">
-                    {{ strtoupper(substr(Auth::user()->full_name, 0, 2)) }}
+                    <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-.3-5 5-5 5 5 5 5H3z"/></svg>
                 </div>
                 <div class="user-info">
                     <div class="user-name">{{ Auth::user()->full_name }}</div>
@@ -1151,6 +1185,17 @@
     </script>
 
     @stack('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            flatpickr('input[type="date"]', {
+                locale: 'vn',
+                dateFormat: 'Y-m-d',
+                allowInput: true,
+            });
+        });
+    </script>
 </body>
 
 </html>
