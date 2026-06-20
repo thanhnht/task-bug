@@ -231,8 +231,8 @@
                 <div class="alert alert-danger" style="margin-top:8px">{{ $message }}</div>
             @enderror
 
-            {{-- ── Pass / Fail (Tester / Admin, khi task đang ở RTT) ────────── --}}
-            @if ($task->status === 'ready_to_test' && ($role === 'tester' || Auth::user()->isAdmin()))
+            {{-- ── Pass / Fail (Tester / Admin, khi task đang ở RTT, không phải bug) ── --}}
+            @if ($task->status === 'ready_to_test' && $task->type === 'task' && ($role === 'tester' || Auth::user()->isAdmin()))
             <div class="pass-fail-bar">
                 {{-- Pass --}}
                 <form method="POST" action="{{ route('projects.tasks.transition', [$project, $task]) }}">
