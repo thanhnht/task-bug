@@ -1,0 +1,156 @@
+@startuml UC-00 Tổng quan hệ thống
+title Biểu đồ Use Case Tổng quan\nHệ thống Task Bug Management
+
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam usecase {
+    BackgroundColor #EEF4FF
+    BorderColor #2563eb
+    ArrowColor #2563eb
+    FontSize 12
+}
+skinparam actor {
+    BackgroundColor #DBEAFE
+    BorderColor #1e40af
+    FontColor #1e1f22
+}
+skinparam note {
+    BackgroundColor #FFFBEB
+    BorderColor #D97706
+}
+skinparam ArrowColor #374151
+skinparam linetype ortho
+
+left to right direction
+
+actor "Admin" as Admin #LightSkyBlue
+actor "Project\nManager (PM)" as PM #PaleGreen
+actor "Developer" as Dev #LightYellow
+actor "Tester" as Tester #MistyRose
+
+Admin -[#1e40af]-|> PM : ""
+PM -[#2563eb]-|> Dev : ""
+
+rectangle "  Hệ thống Task Bug Management  " {
+
+    package "Xác thực" as PKG_AUTH #F0F9FF {
+        (Đăng nhập) as UC01
+        (Đổi mật khẩu\nlần đầu) as UC02
+        (Đăng xuất) as UC03
+    }
+
+    package "Quản trị người dùng" as PKG_ADMIN #FFF7ED {
+        (Tạo tài khoản\nnhân viên) as UC04
+        (Reset mật khẩu) as UC05
+        (Kích hoạt /\nVô hiệu hóa) as UC06
+        (Mở khóa\ntài khoản) as UC07
+    }
+
+    package "Quản lý dự án" as PKG_PROJ #F0FDF4 {
+        (Tạo dự án) as UC08
+        (Xem dự án) as UC09
+        (Chỉnh sửa dự án) as UC10
+        (Quản lý thành viên) as UC11
+    }
+
+    package "Quản lý Task" as PKG_TASK #FAFAFA {
+        (Tạo task gốc) as UC12
+        (Tạo child task) as UC13
+        (Xem chi tiết task) as UC14
+        (Chỉnh sửa task) as UC15
+        (Chuyển trạng thái) as UC16
+        (Pass / Fail\nkiểm thử) as UC17
+    }
+
+    package "Theo dõi Bug" as PKG_BUG #FFF1F2 {
+        (Báo lỗi từ QA) as UC18
+        (Tạo Bug Production) as UC19
+    }
+
+    package "KPI & Chất lượng" as PKG_KPI #F5F3FF {
+        (Xem điểm KPI) as UC20
+        (Xem báo cáo\nchất lượng) as UC21
+    }
+
+    package "Cộng tác" as PKG_COLLAB #FFFBEB {
+        (Viết bình luận\n& đính kèm tệp) as UC22
+        (Quản lý thông báo) as UC23
+    }
+}
+
+' ── Admin ────────────────────────────────
+Admin --> UC01
+Admin --> UC02
+Admin --> UC03
+Admin --> UC04
+Admin --> UC05
+Admin --> UC06
+Admin --> UC07
+Admin --> UC08
+Admin --> UC10
+Admin --> UC11
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+Admin --> UC15
+Admin --> UC16
+Admin --> UC17
+Admin --> UC18
+Admin --> UC19
+Admin --> UC20
+Admin --> UC21
+Admin --> UC22
+Admin --> UC23
+
+' ── PM ───────────────────────────────────
+PM --> UC08
+PM --> UC09
+PM --> UC10
+PM --> UC11
+PM --> UC12
+PM --> UC13
+PM --> UC14
+PM --> UC15
+PM --> UC16
+PM --> UC19
+PM --> UC20
+PM --> UC21
+PM --> UC22
+PM --> UC23
+
+' ── Developer ────────────────────────────
+Dev --> UC01
+Dev --> UC02
+Dev --> UC03
+Dev --> UC09
+Dev --> UC13
+Dev --> UC14
+Dev --> UC15
+Dev --> UC16
+Dev --> UC20
+Dev --> UC21
+Dev --> UC22
+Dev --> UC23
+
+' ── Tester ───────────────────────────────
+Tester --> UC01
+Tester --> UC02
+Tester --> UC03
+Tester --> UC09
+Tester --> UC13
+Tester --> UC14
+Tester --> UC16
+Tester --> UC17
+Tester --> UC18
+Tester --> UC19
+Tester --> UC20
+Tester --> UC21
+Tester --> UC22
+Tester --> UC23
+
+note bottom of PKG_AUTH
+  Admin kế thừa toàn bộ quyền PM.
+  PM kế thừa toàn bộ quyền Developer.
+end note
+
+@enduml

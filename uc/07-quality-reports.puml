@@ -1,0 +1,96 @@
+@startuml UC-07 Báo cáo Chất lượng
+title UC-07: Báo cáo Chất lượng (Quality Reports)
+
+left to right direction
+skinparam actorStyle awesome
+
+actor "Admin" as Admin
+actor "PM" as PM
+actor "Developer" as Dev
+actor "Tester" as Tester
+
+rectangle "Báo cáo tổng quan (/quality)" {
+    usecase "Xem DRE % tổng hợp\ntheo từng dự án" as UC1
+    usecase "Xem số bug mở /\nđóng / retest rate" as UC2
+    usecase "Lọc theo khoảng\nthời gian" as UC3
+}
+
+rectangle "Báo cáo chi tiết dự án (/quality/{project})" {
+    usecase "Xem thống kê task\n(tạo / hoàn thành)" as UC4
+    usecase "Xem thống kê bug\n(DRE %, retest rate)" as UC5
+
+    package "Theo Developer" {
+        usecase "Số task hoàn thành" as UC6a
+        usecase "Số bug phát sinh" as UC6b
+        usecase "Số lần retest" as UC6c
+        usecase "Avg fix time (giờ)" as UC6d
+        usecase "Completion rate %" as UC6e
+    }
+
+    package "Theo Tester" {
+        usecase "Số bug tìm thấy" as UC7a
+        usecase "Số bug đã đóng" as UC7b
+        usecase "Số task đã verify" as UC7c
+        usecase "DRE đóng góp %" as UC7d
+    }
+}
+
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+Admin --> UC4
+Admin --> UC5
+Admin --> UC6a
+Admin --> UC6b
+Admin --> UC6c
+Admin --> UC6d
+Admin --> UC6e
+Admin --> UC7a
+Admin --> UC7b
+Admin --> UC7c
+Admin --> UC7d
+
+PM --> UC1
+PM --> UC2
+PM --> UC3
+PM --> UC4
+PM --> UC5
+PM --> UC6a
+PM --> UC6b
+PM --> UC6c
+PM --> UC6d
+PM --> UC6e
+PM --> UC7a
+PM --> UC7b
+PM --> UC7c
+PM --> UC7d
+
+Dev --> UC1
+Dev --> UC6a
+Dev --> UC6b
+Dev --> UC6c
+Dev --> UC6d
+Dev --> UC6e
+
+Tester --> UC1
+Tester --> UC7a
+Tester --> UC7b
+Tester --> UC7c
+Tester --> UC7d
+
+note right of Dev
+  Developer chỉ thấy
+  số liệu của bản thân
+end note
+
+note right of Tester
+  Tester chỉ thấy
+  số liệu của bản thân
+end note
+
+note bottom of UC1
+  DRE = Defect Removal Efficiency
+  = bug đã đóng / tổng bug × 100%
+end note
+
+@enduml

@@ -1,0 +1,119 @@
+@startuml UC-04 Quy trình Task
+title Biểu đồ Use Case — Quy trình Task (UC-12 đến UC-16)
+
+skinparam actorStyle awesome
+skinparam usecase {
+    BackgroundColor #EEF4FF
+    BorderColor #2563eb
+    FontSize 12
+}
+skinparam actor {
+    BackgroundColor #DBEAFE
+    BorderColor #1e40af
+}
+skinparam note {
+    BackgroundColor #FFFBEB
+    BorderColor #D97706
+}
+
+left to right direction
+
+actor "Admin" as Admin #LightSkyBlue
+actor "PM" as PM #PaleGreen
+actor "Developer" as Dev #LightYellow
+actor "Tester" as Tester #MistyRose
+actor "Hệ thống" as SYS #LightGray
+
+Admin -[#1e40af]-|> PM
+PM -[#2563eb]-|> Dev
+
+rectangle "Module Quản lý Task" {
+
+    package "Tạo Task" {
+        (UC-12\nTạo task gốc\n[Admin / PM]) as UC12
+        (UC-13\nTạo child task\n[mọi thành viên]) as UC13
+        (Tự sinh mã task\n[TSK-NNN]) as UC12_A
+        (Tính SLA due_date\ntheo priority) as UC13_A
+        (Gửi thông báo\n"assigned") as UC_NOTIF
+    }
+
+    package "Xem & Chỉnh sửa" {
+        (UC-14\nXem chi tiết task\n[history, children, comment]) as UC14
+        (UC-15\nChỉnh sửa task\n[tiêu đề, mô tả, assign...]) as UC15
+    }
+
+    package "Chuyển trạng thái" {
+        (UC-16\nChuyển trạng thái task) as UC16
+        (Kiểm tra điều\nkiện chuyển) as UC16_A
+        (Ghi task_histories) as UC16_B
+        (Auto-cascade\nlên task cha) as UC16_C
+    }
+}
+
+' ── Liên kết tác nhân ────────────────────
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+Admin --> UC15
+Admin --> UC16
+
+PM --> UC12
+PM --> UC13
+PM --> UC14
+PM --> UC15
+PM --> UC16
+
+Dev --> UC13
+Dev --> UC14
+Dev --> UC15
+Dev --> UC16
+
+Tester --> UC13
+Tester --> UC14
+Tester --> UC16
+
+SYS --> UC16_C
+
+' ── Quan hệ include / extend ─────────────
+UC12 .> UC12_A : <<include>>
+UC12 .> UC_NOTIF : <<extend>>\n[nếu có assignee]
+
+UC13 .> UC13_A : <<include>>
+UC13 .> UC_NOTIF : <<extend>>\n[nếu có assignee]
+
+UC15 .> UC_NOTIF : <<extend>>\n[nếu assignee thay đổi]
+
+UC16 .> UC16_A : <<include>>
+UC16 .> UC16_B : <<include>>
+UC16 .> UC16_C : <<extend>>\n[nếu là child task]
+
+note right of UC16_A
+  Ràng buộc chuyển trạng thái:
+  → ready_to_test:
+     Tất cả con non-bug = done
+  → review_approved:
+     Chỉ Tester/Admin; root task;
+     không còn bug con mở
+  → done (root):
+     Chỉ PM/Admin; đang ở review_approved;
+     tất cả con (kể cả bug) = done
+  → done (child):
+     Chỉ PM/Tester; bỏ qua review_approved
+end note
+
+note right of UC16_C
+  Auto-cascade:
+  • Tất cả con non-bug done
+    → cha tự → ready_to_test
+  • Con active khi cha todo
+    → cha tự → in_progress
+  • Con bị revert khi cha done/ra/rtt
+    → cha tự → in_progress
+end note
+
+note bottom of UC12
+  Chỉ Admin/PM tạo được root task.
+  Mọi thành viên tạo được child task.
+end note
+
+@enduml

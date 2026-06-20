@@ -1,0 +1,98 @@
+@startuml UC-03 Quản lý Dự án
+title Biểu đồ Use Case — Quản lý Dự án (UC-08 đến UC-11)
+
+skinparam actorStyle awesome
+skinparam usecase {
+    BackgroundColor #EEF4FF
+    BorderColor #2563eb
+    FontSize 12
+}
+skinparam actor {
+    BackgroundColor #DBEAFE
+    BorderColor #1e40af
+}
+skinparam note {
+    BackgroundColor #FFFBEB
+    BorderColor #D97706
+}
+
+left to right direction
+
+actor "Admin" as Admin #LightSkyBlue
+actor "PM" as PM #PaleGreen
+actor "Developer" as Dev #LightYellow
+actor "Tester" as Tester #MistyRose
+
+Admin -[#1e40af]-|> PM
+PM -[#2563eb]-|> Dev
+Tester -[#e11d48]-|> Dev
+
+rectangle "Module Quản lý Dự án" {
+
+    (UC-09\nXem danh sách\ndự án) as UC09
+    (Lọc & tìm kiếm task\ntrong dự án) as UC09_A
+
+    (UC-08\nTạo dự án mới) as UC08
+    (Tự sinh mã dự án\n[PRJ-NNN]) as UC08_A
+    (Thêm thành viên\nban đầu) as UC08_B
+
+    (UC-10\nChỉnh sửa\nthông tin dự án) as UC10
+
+    (UC-11a\nThêm thành viên) as UC11A
+    (UC-11b\nXóa thành viên) as UC11B
+    (UC-11c\nĐổi vai trò\nthành viên) as UC11C
+    (Kiểm tra\ncòn ít nhất 1 PM) as UC11B_A
+}
+
+' ── Liên kết tác nhân ────────────────────
+Admin --> UC08
+Admin --> UC09
+Admin --> UC10
+Admin --> UC11A
+Admin --> UC11B
+Admin --> UC11C
+
+PM --> UC09
+PM --> UC10
+PM --> UC11A
+PM --> UC11B
+PM --> UC11C
+
+Dev --> UC09
+Tester --> UC09
+
+' ── Quan hệ include / extend ─────────────
+UC08 .> UC08_A : <<include>>
+UC08 .> UC08_B : <<extend>>\n[nếu có thành viên\nban đầu]
+
+UC09 .> UC09_A : <<extend>>\n[áp dụng bộ lọc]
+
+UC11B .> UC11B_A : <<include>>
+
+note right of UC09
+  Admin: thấy tất cả dự án
+  Nhân viên: chỉ dự án mình tham gia
+  Phân trang: 12 dự án/trang
+end note
+
+note right of UC09_A
+  Bộ lọc loại task:
+  • Task  • Bug (từ QA)
+  • Bug Production  • Subtask
+  • Research  • Fix  • Test
+  Lọc thêm: trạng thái, người nhận,
+  khoảng ngày, từ khóa tìm kiếm
+end note
+
+note right of UC11B_A
+  Nếu dự án chỉ còn 1 PM
+  và bị xóa → hệ thống từ chối
+end note
+
+note bottom of UC08_B
+  Mỗi nhân viên chỉ có
+  1 vai trò trong 1 dự án
+  (UNIQUE project_id + user_id)
+end note
+
+@enduml

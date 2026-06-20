@@ -1,0 +1,67 @@
+@startuml UC-08 Bình luận & Thông báo
+title UC-08: Bình luận, Đính kèm & Thông báo
+
+left to right direction
+skinparam actorStyle awesome
+
+actor "Admin" as Admin
+actor "Thành viên\n(chung)" as Member
+actor "Hệ thống\n(tự động)" as System
+
+rectangle "Module Bình luận" {
+    usecase "Viết bình luận\nrich text" as UC1
+    usecase "Upload ảnh inline\nvào nội dung" as UC1a
+    usecase "Đính kèm file\n(ảnh, PDF, Office, zip)" as UC1b
+    usecase "Xem bình luận\nvà tệp đính kèm" as UC2
+    usecase "Tải xuống tệp\nđính kèm" as UC2a
+    usecase "Xóa bình luận\ncủa mình" as UC3
+    usecase "Xóa bình luận\nbất kỳ" as UC3a
+}
+
+rectangle "Module Thông báo" {
+    usecase "Xem danh sách\nthông báo (paginated)" as UC4
+    usecase "Nhấn thông báo →\nmở task liên quan" as UC5
+    usecase "Đánh dấu đã đọc\n(từng cái)" as UC6
+    usecase "Đánh dấu tất cả\nđã đọc" as UC7
+
+    usecase "Nhận thông báo\n'Task được gán'" as NOTIF1
+    usecase "Nhận thông báo\n'Bug sẵn sàng test'" as NOTIF2
+    usecase "Nhận thông báo\n'Review Approved'" as NOTIF3
+}
+
+Member --> UC1
+UC1 .> UC1a : <<extend>>
+UC1 .> UC1b : <<extend>>
+Member --> UC2
+UC2 .> UC2a : <<extend>>
+Member --> UC3
+Admin --> UC3a
+
+Member --> UC4
+Member --> UC5
+UC5 .> UC6 : <<include>>
+Member --> UC6
+Member --> UC7
+
+System --> NOTIF1
+System --> NOTIF2
+System --> NOTIF3
+
+NOTIF1 --> Member : gửi tới\nngười được gán
+NOTIF2 --> Member : gửi tới\nTester trong dự án
+NOTIF3 --> Member : gửi tới\nPM trong dự án
+
+note right of UC1b
+  Định dạng: jpg, png, gif, webp,
+  pdf, doc, xlsx, ppt, zip, txt, csv
+  Giới hạn: 20 MB / file
+  Lưu tại: storage/comments/{task_id}/
+end note
+
+note bottom of UC4
+  Tự động đánh dấu tất cả đã đọc
+  khi vào trang /notifications
+  Phân trang: 30 thông báo / trang
+end note
+
+@enduml

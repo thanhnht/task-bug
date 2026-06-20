@@ -1,0 +1,114 @@
+@startuml UC-05 Theo dõi Bug
+title Biểu đồ Use Case — Theo dõi Bug (UC-17, UC-18, UC-19)
+
+skinparam actorStyle awesome
+skinparam usecase {
+    BackgroundColor #EEF4FF
+    BorderColor #2563eb
+    FontSize 12
+}
+skinparam actor {
+    BackgroundColor #DBEAFE
+    BorderColor #1e40af
+}
+skinparam note {
+    BackgroundColor #FFFBEB
+    BorderColor #D97706
+}
+
+left to right direction
+
+actor "Admin" as Admin #LightSkyBlue
+actor "PM" as PM #PaleGreen
+actor "Developer" as Dev #LightYellow
+actor "Tester" as Tester #MistyRose
+actor "Hệ thống" as SYS #LightGray
+
+Admin -[#1e40af]-|> PM
+
+rectangle "Module Theo dõi Bug" {
+
+    package "Pass / Fail Kiểm thử (UC-17)" {
+        (UC-17\nĐánh giá kết quả\nkiểm thử) as UC17
+        (UC-17a  Pass\n→ Review Approved) as UC17_PASS
+        (UC-17b  Fail\n→ Mở modal tạo bug) as UC17_FAIL
+        (Kiểm tra không còn\nbug con nào mở) as UC17_CHK
+    }
+
+    package "Bug từ QA (UC-18)" {
+        (UC-18\nBáo lỗi từ QA\n[Child Bug]) as UC18
+        (Auto-gán cho\nDeveloper gốc) as UC18_A
+        (Tính SLA due_date) as UC18_B
+        (Hoàn nguyên task cha\nvề In Progress) as UC18_C
+        (Trừ KPI Developer\n[−0.25đ/bug]) as UC18_D
+    }
+
+    package "Bug Production (UC-19)" {
+        (UC-19\nTạo Bug Production\n[root bug]) as UC19
+        (Gán linked story\n[task gây ra lỗi]) as UC19_A
+        (Tìm Dev gốc &\nTester gốc) as UC19_B
+        (Trừ KPI Dev gốc\nvà Tester gốc\n[−5đ mỗi người]) as UC19_C
+    }
+}
+
+' ── Liên kết tác nhân ────────────────────
+Tester --> UC17
+Admin --> UC17
+
+Tester --> UC18
+Admin --> UC18
+
+Admin --> UC19
+PM --> UC19
+Dev --> UC19
+Tester --> UC19
+
+PM --> UC19_A
+Admin --> UC19_A
+
+SYS --> UC18_A
+SYS --> UC18_B
+SYS --> UC18_C
+SYS --> UC19_B
+
+' ── Quan hệ include / extend ─────────────
+UC17 .> UC17_CHK : <<include>>
+UC17 .> UC17_PASS : <<extend>>\n[không còn bug mở]
+UC17 .> UC17_FAIL : <<extend>>\n[có lỗi]
+
+UC17_FAIL .> UC18 : <<include>>\n[tạo child bug qua modal]
+
+UC18 .> UC18_A : <<include>>
+UC18 .> UC18_B : <<include>>
+UC18 .> UC18_C : <<include>>
+UC18 .> UC18_D : <<include>>
+
+UC19 .> UC19_A : <<extend>>\n[chỉ PM / Admin\nmới gán được]
+UC19 .> UC19_B : <<include>>\n[khi có linked story]
+UC19_B .> UC19_C : <<include>>
+
+note right of UC17
+  Chỉ hiển thị nút Pass/Fail
+  khi task.type = 'task' (root)
+  đang ở trạng thái ready_to_test.
+  Các loại khác dùng dropdown
+  chuyển trạng thái thông thường.
+end note
+
+note right of UC19_A
+  Developer gốc = người cuối cùng
+  chuyển story → ready_to_test
+  Tester gốc = người cuối cùng
+  chuyển story → review_approved
+  (tra trong task_histories)
+end note
+
+note bottom of UC19
+  Bug Production là task GỐC
+  (parent_id = null,
+   is_production_bug = true).
+  Khác hoàn toàn với bug
+  con phát sinh trong RTT.
+end note
+
+@enduml

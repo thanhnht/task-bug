@@ -1,0 +1,74 @@
+@startuml UC-06 KPI
+title UC-06: Hệ thống KPI & Điểm hiệu suất
+
+left to right direction
+skinparam actorStyle awesome
+
+actor "Admin" as Admin
+actor "PM" as PM
+actor "Developer" as Dev
+actor "Tester" as Tester
+actor "Hệ thống\n(tự động)" as System
+
+rectangle "Xem KPI" {
+    usecase "Xem điểm KPI\ncá nhân tháng này" as UC1
+    usecase "Xem lịch sử\ngiao dịch trừ điểm" as UC2
+    usecase "Xem bảng KPI\ntoàn đội (sắp xếp tăng dần)" as UC3
+}
+
+rectangle "Trừ điểm tự động (Hệ thống)" {
+    usecase "Trừ -2đ/ngày\n(Task trễ hạn khi Done)" as AUTO1
+    usecase "Trừ -0.25đ/bug\n(Bug con được tạo)" as AUTO2
+    usecase "Trừ -0.5đ/ngày\n(RTT Soak > 48h)" as AUTO3
+    usecase "Trừ -5đ\n(Production Bug\ncho cả dev + tester)" as AUTO4
+}
+
+Dev --> UC1
+Dev --> UC2
+Tester --> UC1
+Tester --> UC2
+PM --> UC1
+PM --> UC2
+PM --> UC3
+Admin --> UC1
+Admin --> UC2
+Admin --> UC3
+
+System --> AUTO1
+System --> AUTO2
+System --> AUTO3
+System --> AUTO4
+
+note right of AUTO1
+  Trigger: task → done
+  Đếm số ngày trễ so với due_date
+  Trừ Developer gốc
+end note
+
+note right of AUTO2
+  Trigger: storeChild() tạo bug con
+  Trừ Developer gốc của task cha
+end note
+
+note right of AUTO3
+  Trigger: Tester chuyển task
+  ra khỏi ready_to_test
+  Đếm ngày vượt 48h
+  Trừ Tester đang giữ
+end note
+
+note right of AUTO4
+  Trigger: store() tạo production bug
+  Trừ cả Dev gốc lẫn Tester gốc
+  Tìm qua task_histories
+  của linked story
+end note
+
+note bottom of UC3
+  PM/Admin thấy toàn đội
+  Sắp xếp: điểm thấp nhất lên đầu
+  Công thức: max(0, 100 + sum(points))
+  Tính theo tháng (period_month: YYYY-MM)
+end note
+
+@enduml

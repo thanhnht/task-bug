@@ -1,0 +1,86 @@
+@startuml UC-01 Xác thực
+title Biểu đồ Use Case — Xác thực & Quản lý Phiên làm việc
+
+skinparam actorStyle awesome
+skinparam usecase {
+    BackgroundColor #EEF4FF
+    BorderColor #2563eb
+    FontSize 12
+}
+skinparam actor {
+    BackgroundColor #DBEAFE
+    BorderColor #1e40af
+}
+skinparam note {
+    BackgroundColor #FFFBEB
+    BorderColor #D97706
+}
+
+left to right direction
+
+actor "Người dùng\n(chưa đăng nhập)" as Guest
+actor "Người dùng\n(đã đăng nhập)" as User
+actor "Hệ thống" as SYS #LightGray
+
+rectangle "Module Xác thực" {
+
+    (Đăng nhập\nbằng username) as UC01
+    (Kiểm tra\ntài khoản bị khóa) as UC01_A
+    (Kiểm tra\ntài khoản active) as UC01_B
+    (Ghi nhận lần\nsai mật khẩu) as UC01_C
+    (Khóa tài khoản\n[sau 3 lần sai]) as UC01_D
+
+    (Đổi mật khẩu\nlần đầu [bắt buộc]) as UC02
+    (Kiểm tra độ mạnh\nmật khẩu mới) as UC02_A
+
+    (Đăng xuất) as UC03
+}
+
+' ── Liên kết tác nhân ────────────────────
+Guest --> UC01
+Guest --> UC03
+
+User --> UC02
+User --> UC03
+
+SYS --> UC01_A
+SYS --> UC01_B
+SYS --> UC01_C
+SYS --> UC01_D
+
+' ── Quan hệ include / extend ─────────────
+UC01 .> UC01_A : <<include>>
+UC01 .> UC01_B : <<include>>
+UC01 .> UC01_C : <<extend>>\n[sai mật khẩu]
+UC01_C .> UC01_D : <<extend>>\n[đủ 3 lần]
+
+UC01 .> UC02 : <<extend>>\n[is_first_login = true]
+
+UC02 .> UC02_A : <<include>>
+
+note right of UC01
+  Đăng nhập bằng USERNAME,
+  không phải email.
+  Thứ tự kiểm tra:
+  1. Tài khoản tồn tại?
+  2. Đang bị khóa?
+  3. Đang active?
+  4. Mật khẩu đúng?
+end note
+
+note right of UC01_D
+  locked_until = now() + 30 phút
+  Tự mở sau 30' hoặc Admin mở (UC-07)
+end note
+
+note right of UC02
+  Yêu cầu mật khẩu mới:
+  • Tối thiểu 8 ký tự
+  • Có chữ hoa, chữ số
+  • Có ký tự đặc biệt (@$!%*#?&)
+  • Không trùng mật khẩu cũ
+  Middleware chặn MỌI route
+  cho đến khi đổi thành công.
+end note
+
+@enduml

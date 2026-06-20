@@ -1,0 +1,90 @@
+@startuml UC-02 Quản trị Người dùng
+title Biểu đồ Use Case — Quản trị Người dùng (UC-04 đến UC-07)
+
+skinparam actorStyle awesome
+skinparam usecase {
+    BackgroundColor #EEF4FF
+    BorderColor #2563eb
+    FontSize 12
+}
+skinparam actor {
+    BackgroundColor #DBEAFE
+    BorderColor #1e40af
+}
+skinparam note {
+    BackgroundColor #FFFBEB
+    BorderColor #D97706
+}
+
+left to right direction
+
+actor "Admin" as Admin #LightSkyBlue
+actor "Nhân viên" as Employee
+actor "Hệ thống" as SYS #LightGray
+
+rectangle "Module Quản trị Người dùng" {
+
+    (Xem danh sách\nnhân viên & thống kê) as UC_LIST
+
+    (UC-04\nTạo tài khoản\nnhân viên) as UC04
+    (Tự sinh username\nvà mật khẩu tạm) as UC04_A
+    (Gửi email chào mừng\nvới thông tin đăng nhập) as UC04_B
+
+    (UC-05\nReset mật khẩu\nnhân viên) as UC05
+
+    (UC-06\nKích hoạt /\nVô hiệu hóa tài khoản) as UC06
+
+    (UC-07\nMở khóa\ntài khoản) as UC07
+
+    (Tự động khóa\nsau 3 lần sai) as AUTO_LOCK
+    (Tự động mở khóa\nsau 30 phút) as AUTO_UNLOCK
+    (Tự đăng xuất khi\ntài khoản bị vô hiệu hóa) as AUTO_LOGOUT
+}
+
+' ── Liên kết tác nhân ────────────────────
+Admin --> UC_LIST
+Admin --> UC04
+Admin --> UC05
+Admin --> UC06
+Admin --> UC07
+
+Employee --> AUTO_LOCK
+SYS --> AUTO_UNLOCK
+SYS --> AUTO_LOGOUT
+
+' ── Quan hệ include / extend ─────────────
+UC04 .> UC04_A : <<include>>
+UC04 .> UC04_B : <<include>>
+
+UC05 .> UC04_B : <<include>>\n[gửi pass mới]
+UC05 ..> UC04 : <<extend>>\n[đặt lại\nis_first_login = true]
+
+UC06 ..> AUTO_LOGOUT : <<extend>>\n[nếu đang online]
+
+UC07 ..> AUTO_LOCK : <<extend>>\n[mở khóa thủ công\ntrước 30 phút]
+
+AUTO_LOCK ..> AUTO_UNLOCK : <<extend>>\n[sau 30 phút]
+
+note top of UC04
+  Chỉ Admin mới tạo được
+  tài khoản nhân viên.
+end note
+
+note right of UC04_A
+  Username = họ + chữ cái đầu
+  tên đệm + tên
+  Ví dụ: "Nguyễn Văn A" → nguyenvana
+end note
+
+note bottom of UC06
+  Không thể vô hiệu hóa
+  tài khoản Admin.
+end note
+
+note bottom of UC_LIST
+  Thống kê hiển thị:
+  Tổng · Đang active
+  Chờ đổi mật khẩu · Đang bị khóa
+end note
+
+@enduml
